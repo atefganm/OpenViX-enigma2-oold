@@ -12,6 +12,8 @@
 #endif
 #include <lib/gdi/glcddc.h>
 
+#define DM900_LCD_Y_OFFSET 4
+
 eLCD *eLCD::instance;
 
 eLCD::eLCD()
@@ -29,11 +31,13 @@ eLCD *eLCD::getInstance()
 
 void eLCD::setSize(int xres, int yres, int bpp)
 {
-	res = eSize(xres, yres);
+	_stride = xres * bpp / 8;
 	_buffer = new unsigned char[xres * yres * bpp/8];
-	memset(_buffer, 0, res.height() * res.width() * bpp / 8);
-	_stride = res.width() * bpp / 8;
-	eDebug("[eLCD] (%dx%dx%d) buffer %p %d bytes, stride %d", xres, yres, bpp, _buffer, xres * yres * bpp / 8, _stride);
+	if ((strcmp(boxtype_name, "dm900\n") == 0) || (strcmp(boxtype_name, "dm920\n") == 0))
+		xres -= DM900_LCD_Y_OFFSET;
+	res = eSize(xres, yres);
+	memset(_buffer, 0, xres * yres * bpp / 8);
+	eDebug("[eLCD] (%dx%dx%d) buffer %p %d bytes, stride %d, boxtype: %s", xres, yres, bpp, _buffer, xres * yres * bpp / 8, _stride, boxtype_name);
 }
 
 eLCD::~eLCD()
@@ -250,92 +254,158 @@ eDBoxLCD::~eDBoxLCD()
 void eDBoxLCD::update()
 {
 #if !defined(HAVE_TEXTLCD) && !defined(HAVE_7SEGMENT)
-	if (lcdfd < 0)
-		return;
-
-	if (lcd_type == 0 || lcd_type == 2)
+	if (lcdfd >= 0)
 	{
-		unsigned char raw[132 * 8];
-		int x, y, yy;
-		for (y = 0; y < 8; y++)
+		if (lcd_type == 0 || lcd_type == 2)
 		{
-			for (x = 0; x < 132; x++)
+			unsigned char raw[132*8];
+			int x, y, yy;
+			for (y=0; y<8; y++)
 			{
-				int pix = 0;
-				for (yy = 0; yy < 8; yy++)
-					pix |= (_buffer[(y * 8 + yy) * 132 + x] >= 108) << yy;
-				if (flipped)
+				for (x=0; x<132; x++)
 				{
-					/* 8 pixels per byte, swap bits */
-#define BIT_SWAP(a) (( ((a << 7)&0x80) + ((a << 5)&0x40) + ((a << 3)&0x20) + ((a << 1)&0x10) + ((a >> 1)&0x08) + ((a >> 3)&0x04) + ((a >> 5)&0x02) + ((a >> 7)&0x01) )&0xff)
-					raw[(7 - y) * 132 + (131 - x)] = BIT_SWAP(pix ^ inverted);
-				}
-				else
-				{
-					raw[y * 132 + x] = pix ^ inverted;
-				}
-			}
-		}
-		write(lcdfd, raw, 132*8);
-	}
-	else if (lcd_type == 3)
-	{
-		/* for now, only support flipping / inverting for 8bpp displays */
-		if ((flipped || inverted) && _stride == res.width())
-		{
-			unsigned int height = res.height();
-			unsigned int width = res.width();
-			unsigned char raw[_stride * height];
-			for (unsigned int y = 0; y < height; y++)
-			{
-				for (unsigned int x = 0; x < width; x++)
-				{
+					int pix=0;
+					for (yy=0; yy<8; yy++)
+					{
+						pix|=(_buffer[(y*8+yy)*132+x]>=108)<<yy;
+					}
 					if (flipped)
 					{
-						/* 8bpp, no bit swapping */
-						raw[(height - 1 - y) * width + (width - 1 - x)] = _buffer[y * width + x] ^ inverted;
+						/* 8 pixels per byte, swap bits */
+#define BIT_SWAP(a) (( ((a << 7)&0x80) + ((a << 5)&0x40) + ((a << 3)&0x20) + ((a << 1)&0x10) + ((a >> 1)&0x08) + ((a >> 3)&0x04) + ((a >> 5)&0x02) + ((a >> 7)&0x01) )&0xff)
+						raw[(7 - y) * 132 + (131 - x)] = BIT_SWAP(pix ^ inverted);
 					}
 					else
 					{
-						raw[y * width + x] = _buffer[y * width + x] ^ inverted;
+						raw[y * 132 + x] = pix ^ inverted;
 					}
 				}
 			}
-			write(lcdfd, raw, _stride * height);
+			write(lcdfd, raw, 132*8);
 		}
-		else
+		else if (lcd_type == 3)
 		{
-			write(lcdfd, _buffer, _stride * res.height());
-		}
-	}
-	else /* lcd_type == 1 */
-	{
-		unsigned char raw[64*64];
-		int x, y;
-		memset(raw, 0, 64*64);
-		for (y=0; y<64; y++)
-		{
-			int pix=0;
-			for (x=0; x<128 / 2; x++)
+			/* for now, only support flipping / inverting for 8bpp displays */
+			if ((flipped || inverted) && _stride == res.width())
 			{
-				pix = (_buffer[y*132 + x * 2 + 2] & 0xF0) |(_buffer[y*132 + x * 2 + 1 + 2] >> 4);
-				if (inverted)
-					pix = 0xFF - pix;
-				if (flipped)
+				unsigned int height = res.height();
+				unsigned int width = res.width();
+				unsigned char raw[_stride * height];
+				for (unsigned int y = 0; y < height; y++)
 				{
-					/* device seems to be 4bpp, swap nibbles */
-					unsigned char byte;
-					byte = (pix >> 4) & 0x0f;
-					byte |= (pix << 4) & 0xf0;
-					raw[(63 - y) * 64 + (63 - x)] = byte;
+					for (unsigned int x = 0; x < width; x++)
+					{
+						if (flipped)
+						{
+							/* 8bpp, no bit swapping */
+							raw[(height - 1 - y) * width + (width - 1 - x)] = _buffer[y * width + x] ^ inverted;
+						}
+						else
+						{
+							raw[y * width + x] = _buffer[y * width + x] ^ inverted;
+						}
+					}
 				}
+				write(lcdfd, raw, _stride * height);
+			}
+			else
+			{
+				FILE *file;
+/*
+				FILE *boxtype_file;
+				char boxtype_name[20];
+				if((boxtype_file = fopen("/proc/stb/info/boxtype", "r")) != NULL)
+				{
+					fgets(boxtype_name, sizeof(boxtype_name), boxtype_file);
+					fclose(boxtype_file);
+				}
+				else if((boxtype_file = fopen("/proc/stb/info/model", "r")) != NULL)
+				{
+					fgets(boxtype_name, sizeof(boxtype_name), boxtype_file);
+					fclose(boxtype_file);
+				}
+*/
+				if ((strcmp(boxtype_name, "dm900\n") == 0) || (strcmp(boxtype_name, "dm920\n") == 0))
+				{
+					unsigned char gb_buffer[_stride * res.height()];
+					for (int offset = 0; offset < ((_stride * res.height())>>2); offset ++)
+					{
+						unsigned int src = 0;
+						if (offset%(_stride>>2) >= DM900_LCD_Y_OFFSET)
+							src = ((unsigned int*)_buffer)[offset - DM900_LCD_Y_OFFSET];
+						//                                             blue                         red                  green low                     green high
+						((unsigned int*)gb_buffer)[offset] = ((src >> 3) & 0x001F001F) | ((src << 3) & 0xF800F800) | ((src >> 8) & 0x00E000E0) | ((src << 8) & 0x07000700);
+					}
+					write(lcdfd, gb_buffer, _stride * res.height());
+					if (file != NULL)
+					{
+						fclose(file);
+					}
+				}
+#ifdef LCD_COLOR_BITORDER_RGB565
+				else if (((file = fopen("/proc/stb/info/gbmodel", "r")) != NULL ) || (strcmp(boxtype_name, "7100S\n") == 0) || (strcmp(boxtype_name, "7200S\n") == 0) || (strcmp(boxtype_name, "7210S\n") == 0) || (strcmp(boxtype_name, "7215S\n") == 0) || (strcmp(boxtype_name, "7205S\n") == 0) || (strcmp(boxtype_name, "8100S\n") == 0))
+				{
+					//gggrrrrrbbbbbggg bit order from memory
+					//gggbbbbbrrrrrggg bit order to LCD
+					unsigned char gb_buffer[_stride * res.height()];
+					if(! (0x03 & (_stride * res.height())))
+					{//fast
+						for (int offset = 0; offset < ((_stride * res.height())>>2); offset ++)
+						{
+							unsigned int src = ((unsigned int*)_buffer)[offset];
+							((unsigned int*)gb_buffer)[offset] = src & 0xE007E007 | (src & 0x1F001F00) >>5 | (src & 0x00F800F8) << 5;
+						}
+					}
+					else
+					{//slow
+						for (int offset = 0; offset < _stride * res.height(); offset += 2)
+						{
+							gb_buffer[offset] = (_buffer[offset] & 0x07) | ((_buffer[offset + 1] << 3) & 0xE8);
+							gb_buffer[offset + 1] = (_buffer[offset + 1] & 0xE0)| ((_buffer[offset] >> 3) & 0x1F);
+						}
+					}
+					write(lcdfd, gb_buffer, _stride * res.height());
+					if (file != NULL)
+					{
+						fclose(file);
+					}
+				}
+#endif
 				else
 				{
-					raw[y * 64 + x] = pix;
+					write(lcdfd, _buffer, _stride * res.height());
 				}
 			}
 		}
-		write(lcdfd, raw, 64*64);
+		else /* lcd_type == 1 */
+		{
+			unsigned char raw[64*64];
+			int x, y;
+			memset(raw, 0, 64*64);
+			for (y=0; y<64; y++)
+			{
+				int pix=0;
+				for (x=0; x<128 / 2; x++)
+				{
+					pix = (_buffer[y*132 + x * 2 + 2] & 0xF0) |(_buffer[y*132 + x * 2 + 1 + 2] >> 4);
+					if (inverted)
+						pix = 0xFF - pix;
+					if (flipped)
+					{
+						/* device seems to be 4bpp, swap nibbles */
+						unsigned char byte;
+						byte = (pix >> 4) & 0x0f;
+						byte |= (pix << 4) & 0xf0;
+						raw[(63 - y) * 64 + (63 - x)] = byte;
+					}
+					else
+					{
+						raw[y * 64 + x] = pix;
+					}
+				}
+			}
+			write(lcdfd, raw, 64*64);
+		}
 	}
 #endif
 }

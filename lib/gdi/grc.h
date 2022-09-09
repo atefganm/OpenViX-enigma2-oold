@@ -204,6 +204,11 @@ public:
 
 	void submit(const gOpcode &o);
 
+#ifdef CONFIG_ION
+	void lock();
+	void unlock();
+#endif
+
 	sigc::signal<void()> notify;
 
 	void setSpinnerDC(gDC *dc) { m_spinner_dc = dc; }

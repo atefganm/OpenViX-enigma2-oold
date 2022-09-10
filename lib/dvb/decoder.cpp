@@ -1,6 +1,7 @@
 #include <lib/base/cfile.h>
 #include <lib/base/ebase.h>
 #include <lib/base/eerror.h>
+#include <lib/base/nconfig.h> // access to python config
 #include <lib/base/wrappers.h>
 #include <lib/dvb/decoder.h>
 #include <lib/components/tuxtxtapp.h>
@@ -65,10 +66,12 @@ eDVBAudio::eDVBAudio(eDVBDemux *demux, int dev)
 		m_fd_demux = -1;
 	}
 
+#ifndef DREAMBOX
 	if (m_fd >= 0)
 	{
 		::ioctl(m_fd, AUDIO_SELECT_SOURCE, demux ? AUDIO_SOURCE_DEMUX : AUDIO_SOURCE_HDMI);
 	}
+#endif
 }
 
 int eDVBAudio::startPid(int pid, int type)
@@ -145,8 +148,12 @@ int eDVBAudio::startPid(int pid, int type)
 			bypass = 0x40;
 			break;
 		case aDDP:
-			bypass = 0x22;
-			break;
+#ifdef DREAMBOX
+		bypass = 7;
+#else
+		bypass = 0x22;
+#endif
+		break;
 		}
 
 		eDebugNoNewLineStart("[eDVBAudio%d] AUDIO_SET_BYPASS bypass=%d ", m_dev, bypass);
@@ -306,11 +313,14 @@ eDVBVideo::eDVBVideo(eDVBDemux *demux, int dev)
 		m_fd_demux = -1;
 	}
 
+std::string zapmodeDM = eConfigManager::getConfigValue("config.misc.zapmodeDM");
+if (zapmodeDM == "hold")
+{
 	if (m_fd >= 0)
 	{
 		::ioctl(m_fd, VIDEO_SELECT_SOURCE, demux ? VIDEO_SOURCE_DEMUX : VIDEO_SOURCE_HDMI);
 	}
-
+}
 	if (m_close_invalidates_attributes < 0)
 	{
 		/*
@@ -339,7 +349,11 @@ eDVBVideo::eDVBVideo(eDVBDemux *demux, int dev)
 #define VIDEO_STREAMTYPE_MPEG4_Part2 4
 #define VIDEO_STREAMTYPE_VC1_SM 5
 #define VIDEO_STREAMTYPE_MPEG1 6
+#ifdef DREAMBOX
+#define VIDEO_STREAMTYPE_H265_HEVC 22
+#else
 #define VIDEO_STREAMTYPE_H265_HEVC 7
+#endif
 #define VIDEO_STREAMTYPE_AVS 16
 #define VIDEO_STREAMTYPE_AVS2 40
 
@@ -1319,10 +1333,6 @@ RESULT eTSMPEGDecoder::showSinglePic(const char *filename)
 		{
 			struct stat s = {};
 			fstat(f, &s);
-#if HAVE_HISILICON
-			if (m_video_clip_fd >= 0)
-				finishShowSinglePic();
-#endif
 			if (m_video_clip_fd == -1)
 				m_video_clip_fd = open("/dev/dvb/adapter0/video0", O_WRONLY);
 			if (m_video_clip_fd >= 0)
@@ -1341,13 +1351,9 @@ RESULT eTSMPEGDecoder::showSinglePic(const char *filename)
 					streamtype = VIDEO_STREAMTYPE_MPEG4_H264;
 				else
 					streamtype = VIDEO_STREAMTYPE_MPEG2;
-#if HAVE_HISILICON
-				if (ioctl(m_video_clip_fd, VIDEO_SELECT_SOURCE, 0xff) < 0)
-					eDebug("[eTSMPEGDecoder] VIDEO_SELECT_SOURCE MEMORY failed: %m");
-#else
+
 				if (ioctl(m_video_clip_fd, VIDEO_SELECT_SOURCE, VIDEO_SOURCE_MEMORY) < 0)
 					eDebug("[eTSMPEGDecoder] VIDEO_SELECT_SOURCE MEMORY failed: %m");
-#endif
 				if (ioctl(m_video_clip_fd, VIDEO_SET_STREAMTYPE, streamtype) < 0)
 					eDebug("[eTSMPEGDecoder] VIDEO_SET_STREAMTYPE failed: %m");
 				if (ioctl(m_video_clip_fd, VIDEO_PLAY) < 0)
@@ -1369,11 +1375,7 @@ RESULT eTSMPEGDecoder::showSinglePic(const char *filename)
 					if (ret < 0) eDebug("[eTSMPEGDecoder] write failed: %m");
 				}
 				writeAll(m_video_clip_fd, stuffing, 8192);
-#if HAVE_HISILICON
-				;
-#else
 				m_showSinglePicTimer->start(150, true);
-#endif
 			}
 			close(f);
 		}

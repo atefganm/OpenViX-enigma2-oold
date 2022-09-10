@@ -321,6 +321,8 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 		goto error;
 	}
 
+#ifdef HAVE_OLDE2_API
+#if defined DTV_ENUM_DELSYS
 	prop[0].cmd = DTV_ENUM_DELSYS;
 	memset(prop[0].u.buffer.data, 0, sizeof(prop[0].u.buffer.data));
 	prop[0].u.buffer.len = 0;
@@ -329,7 +331,17 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 
 	if (ioctl(frontend, FE_GET_PROPERTY, &props) < 0)
 		eDebug("[eDVBUsbAdapter] FE_GET_PROPERTY DTV_ENUM_DELSYS failed %m");
-
+#endif
+#else
+	prop[0].cmd = DTV_ENUM_DELSYS;
+	memset(prop[0].u.buffer.data, 0, sizeof(prop[0].u.buffer.data));
+	prop[0].u.buffer.len = 0;
+	props.num = 1;
+	props.props = prop;
+ 
+	if (ioctl(frontend, FE_GET_PROPERTY, &props) < 0)
+		eDebug("[eDVBUsbAdapter] FE_GET_PROPERTY DTV_ENUM_DELSYS failed %m");
+#endif
 	::close(frontend);
 	frontend = -1;
 
@@ -414,24 +426,21 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 #define VTUNER_SET_FE_INFO      6
 #define VTUNER_SET_NUM_MODES    7
 #define VTUNER_SET_MODES        8
-#else				/* ARM receivers return _IOC_NONE=0 */
-#define VTUNER_GET_MESSAGE     11
-#define VTUNER_SET_RESPONSE    12
-#define VTUNER_SET_NAME        13
-#define VTUNER_SET_TYPE        14
-#define VTUNER_SET_HAS_OUTPUTS 15
-#define VTUNER_SET_FE_INFO     16
-#define VTUNER_SET_NUM_MODES   17
-#define VTUNER_SET_MODES       18
-#endif
 #define VTUNER_SET_DELSYS      32
 #define VTUNER_SET_ADAPTER     33
 
 	ioctl(vtunerFd, VTUNER_SET_NAME, name);
 	ioctl(vtunerFd, VTUNER_SET_TYPE, type);
 	ioctl(vtunerFd, VTUNER_SET_FE_INFO, &fe_info);
+#ifdef HAVE_OLDE2_API
+#if defined DTV_ENUM_DELSYS
 	if (prop[0].u.buffer.len > 0)
 		ioctl(vtunerFd, VTUNER_SET_DELSYS, prop[0].u.buffer.data);
+#endif
+#else
+	if (prop[0].u.buffer.len > 0)
+		ioctl(vtunerFd, VTUNER_SET_DELSYS, prop[0].u.buffer.data);
+#endif
 	ioctl(vtunerFd, VTUNER_SET_HAS_OUTPUTS, "no");
 	ioctl(vtunerFd, VTUNER_SET_ADAPTER, nr);
 
@@ -762,10 +771,18 @@ bool eDVBResourceManager::frontendIsCompatible(int index, const char *type)
 			}
 			else if (!strcmp(type, "DVB-C"))
 			{
+#ifdef HAVE_OLDE2_API
+#if DVB_API_VERSION > 5 || DVB_API_VERSION == 5 && DVB_API_VERSION_MINOR >= 6
+				return i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_A, false) || i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_C, false);
+#else
+				return i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_AC, false);
+#endif
+#else
 #if defined SYS_DVBC_ANNEX_A
 				return i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_A, false) || i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_C, false);
 #else
 				return i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_AC, false);
+#endif
 #endif
 			}
 			else if (!strcmp(type, "ATSC"))
@@ -826,11 +843,20 @@ void eDVBResourceManager::setFrontendType(int index, const char *types)
 			}
 			else if (type == "DVB-C")
 			{
+#ifdef HAVE_OLDE2_API
+#if DVB_API_VERSION > 5 || DVB_API_VERSION == 5 && DVB_API_VERSION_MINOR >= 6
+				whitelist.push_back(SYS_DVBC_ANNEX_A);
+				whitelist.push_back(SYS_DVBC_ANNEX_C);
+#else
+				whitelist.push_back(SYS_DVBC_ANNEX_AC);
+#endif
+#else
 #if defined SYS_DVBC_ANNEX_A
 				whitelist.push_back(SYS_DVBC_ANNEX_A);
 				whitelist.push_back(SYS_DVBC_ANNEX_C);
 #else
 				whitelist.push_back(SYS_DVBC_ANNEX_AC);
+#endif
 #endif
 			}
 			else if (type == "ATSC")
@@ -910,10 +936,7 @@ RESULT eDVBResourceManager::allocateFrontend(ePtr<eDVBAllocatedFrontend> &fe, eP
 		}
 
 		if (c)	/* if we have at least one frontend which is compatible with the source, flag this. */
-		{
-			// eDebug("[eDVBResourceManager] allocateFrontend, score=%d", c);
 			foundone = 1;
-		}
 
 		if (!i->m_inuse)
 		{
@@ -1369,8 +1392,10 @@ int tuner_type_channel_default(ePtr<iDVBChannelList> &channellist, const eDVBCha
 						return 40000;
 					case iDVBFrontend::feTerrestrial:
 						return 30000;
+#ifndef HAVE_OLDE2_API
 					case iDVBFrontend::feATSC:
 						return 20000;
+#endif
 					default:
 						break;
 				}
@@ -1678,13 +1703,8 @@ void eDVBChannel::cueSheetEvent(int event)
 				eDebug("[eDVBChannel] skipmode ratio is %lld:90000, bitrate is %d bit/s", m_cue->m_skipmode_ratio, bitrate);
 						/* i agree that this might look a bit like black magic. */
 				m_skipmode_n = 512*1024; /* must be 1 iframe at least. */
-// The / and * are done in order, resulting in a distinct integer
-// truncation after bitrate / 8 / 90000
-// I don't think that this is intended...
-// github.com/OpenViX/enigma2/commit/33d172b5a3ad1b22d69ce60c2102552537b77929
-//				m_skipmode_m = bitrate / 8 / 90000 * m_cue->m_skipmode_ratio / 8;
+				m_skipmode_m = bitrate / 8 / 90000 * m_cue->m_skipmode_ratio / 8;
 				m_skipmode_frames = m_cue->m_skipmode_ratio / 90000;
-				m_skipmode_m = (bitrate / 8) * (m_skipmode_frames / 8);
 				m_skipmode_frames_remainder = 0;
 
 				if (m_cue->m_skipmode_ratio < 0)
@@ -1782,7 +1802,7 @@ void eDVBChannel::getNextSourceSpan(off_t current_offset, size_t bytes_read, off
 	if (m_skipmode_m)
 	{
 		int frames_to_skip = m_skipmode_frames + m_skipmode_frames_remainder;
-		//eDebug("[eDVBChannel] we are at %lld, and we try to skip %d+%d frames from here", current_offset, m_skipmode_frames, m_skipmode_frames_remainder);
+		//eDebug("[eDVBChannel] we are at %llu, and we try to skip %d+%d frames from here", current_offset, m_skipmode_frames, m_skipmode_frames_remainder);
 		size_t iframe_len;
 		off_t iframe_start = current_offset;
 		int frames_skipped = frames_to_skip;
@@ -1953,13 +1973,13 @@ void eDVBChannel::getNextSourceSpan(off_t current_offset, size_t bytes_read, off
 					/* when skipping reverse, however, choose the zone before. */
 					/* This returns a size 0 block, in case you noticed... */
 				--i;
-				eDebug("[eDVBChannel] skip to previous block, which is %jd..%jd", (intmax_t)i->first, (intmax_t)i->second);
+				eDebug("[eDVBChannel] skip to previous block, which is %ju..%ju", i->first, i->second);
 				size_t len = diff_upto(i->second, i->first, max);
 				start = i->second - len;
 				eDebug("[eDVBChannel] skipping to %jd, %zd", (intmax_t)start, len);
 			}
 
-			eDebug("[eDVBChannel] result: %jd, %zx (%jd %jd)", (intmax_t)start, size, (intmax_t)i->first, (intmax_t)i->second);
+			eDebug("[eDVBChannel] result: %jd, %zx (%ju %ju)", (intmax_t)start, size, i->first, i->second);
 			return;
 		}
 	}

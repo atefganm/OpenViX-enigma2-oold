@@ -2043,7 +2043,7 @@ class InfoBarSeek:
 			@staticmethod
 			def generateSkipHelp(context):
 				skipHelp = []
-				for action in [act for ctx, act in getKeyBindingKeys(filterfn=lambda(key): key[0] == context and (key[1].startswith("seek:") or key[1].startswith("seekdef:")))]:
+				for action in [act for ctx, act in getKeyBindingKeys(filterfn=lambda key: key[0] == context and (key[1].startswith("seek:") or key[1].startswith("seekdef:")))]:
 					if action.startswith("seekdef:"):
 						skipTime = boundFunction(InfoBarSeekActionMap.seekTime, action)
 					else:

@@ -913,32 +913,32 @@ class HarddiskManager:
 					print("[Harddisk] Error: Device '%s' (%s) media availability test failed:" % (device, physicalDevice), err)
 					continue
 			# if mediumFound:
-			# 	print "[Harddisk] DEBUG: Device '%s' (%s) has media." % (device, physicalDevice)
-			# print "[Harddisk] DEBUG: device='%s', physicalDevice='%s', devMajor='%s', description='%s'" % (device, physicalDevice, devMajor, description)
+			# 	print("[Harddisk] DEBUG: Device '%s' (%s) has media." % (device, physicalDevice))
+			# print("[Harddisk] DEBUG: device = '%s', physicalDevice = '%s', devMajor = '%s', description = '%s'" % (device, physicalDevice, devMajor, description))
 			if not isCdrom and os.path.exists(devicePath):
 				partitions = [partition for partition in sorted(os.listdir(devicePath)) if partition.startswith(device)]  # Add HDD check for partitions.
 				if len(partitions) == 0:  # Add HDD check for HDD with no partitions (unformatted).
-					print("[Harddisk] Found storage device '%s' (Removable=%s) NoPartitions = %s." % (device, removable, len(partitions))
+					print("[Harddisk] Found storage device '%s' (Removable=%s) NoPartitions = %s." % (device, removable, len(partitions)))
 					self.hdd.append(Harddisk(device, removable))
 					SystemInfo["Harddisk"] = True
 				else:
 					if SystemInfo["HasHiSi"] and devMajor == 8 and len(partitions) >= 4:
-						partitions = partitions[4:]
-					print("[Harddisk] len partitions = %s, device = %s" % (len(partitions), device)))
+						partitions = [] if len(partitions) > 6 else partitions[4:]
+					print("[Harddisk] len partitions = %s, device = %s" % (len(partitions), device))
 					if len(partitions) != 0:
-						print("[Harddisk] Found storage device '%s' (Removable=%s) NoPartitions = %s." % (device, removable, len(partitions))
+						print("[Harddisk] Found storage device '%s' (Removable=%s) NoPartitions = %s." % (device, removable, len(partitions)))
 						self.hdd.append(Harddisk(device, removable))
 						SystemInfo["Harddisk"] = True
-						# self.partitions.append(Partition(mountpoint=self.getMountpoint(device), description=description, force_mounted, device=device))
-						# print "[Harddisk] DEBUG: Partition(mountpoint=%s, description=%s, force_mounted=True, device=%s)" % (self.getMountpoint(device), description, device)
+						# self.partitions.append(Partition(mountpoint = self.getMountpoint(device), description = description, force_mounted, device = device))
+						# print("[Harddisk] DEBUG: Partition(mountpoint=%s, description=%s, force_mounted=True, device=%s)" % (self.getMountpoint(device), description, device))
 						for partition in partitions:
 							description = self.getUserfriendlyDeviceName(partition, physicalDevice)
-							print("[Harddisk] Found partition '%s', description='%s', device='%s'." % (partition, description, physicalDevice)))
+							print("[Harddisk] Found partition '%s', description='%s', device='%s'." % (partition, description, physicalDevice))
 							part = Partition(mountpoint=self.getMountpoint(partition), description=description, force_mounted=True, device=partition)
 							self.partitions.append(part)
-							# print "[Harddisk] DEBUG: Partition(mountpoint=%s, description=%s, force_mounted=True, device=%s)" % (self.getMountpoint(partition), description, partition)
+							# print("[Harddisk] DEBUG: Partition(mountpoint = %s, description = %s, force_mounted = True, device = %s)" % (self.getMountpoint(partition), description, partition))
 							self.on_partition_list_change("add", part)
-							# print "[Harddisk] DEBUG: on_partition_list_change('add', Partition(mountpoint=%s, description=%s, force_mounted=True, device=%s))" % (self.getMountpoint(partition), description, partition)
+							# print("[Harddisk] DEBUG: on_partition_list_change('add', Partition(mountpoint = %s, description = %s, force_mounted = True, device = %s))" % (self.getMountpoint(partition), description, partition))
 		self.hdd.sort()
 		print("[Harddisk] Enumerating block devices complete.")
 

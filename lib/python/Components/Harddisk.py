@@ -425,7 +425,7 @@ class Harddisk:
 			task.args.append("-uS")
 			task.args.append(self.disk_path)
 			if size > 128000:
-				print "[Harddisk] Detected >128GB disk, using 4k alignment."
+				print("[Harddisk] Detected >128GB disk, using 4k alignment.")
 				task.initial_input = "8,\n;0,0\n;0,0\n;0,0\ny\n"  # Start at sector 8 to better support 4k aligned disks.
 			else:
 				task.initial_input = "0,\n;\n;\n;\ny\n"  # Smaller disks (CF cards, sticks etc) don't need that.
@@ -528,7 +528,7 @@ class Harddisk:
 		filename = os.path.join("/sys/block", self.device, "stat")
 		data = readFile(filename)
 		if data is None:
-			print "[Harddisk] Error: Failed to read '%s' stats!" % filename
+			print("[Harddisk] Error: Failed to read '%s' stats!" % filename)
 			return -1, -1
 		data = data.split()
 		return int(data[0]), int(data[4])  # Return read I/Os, write I/Os.

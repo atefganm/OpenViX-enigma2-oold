@@ -49,7 +49,7 @@ def setRTCoffset():
 
 
 def setRTCtime(wutime):
-        if path.exists("/proc/stb/fp/rtc_offset"):
+	if path.exists("/proc/stb/fp/rtc_offset"):
 		setRTCoffset()
 	try:
 		f = open("/proc/stb/fp/rtc", "w")

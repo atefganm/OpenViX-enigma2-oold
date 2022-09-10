@@ -146,7 +146,7 @@ def loadResumePoints():
 		PickleFile = cPickle.load(file)
 		file.close()
 		return PickleFile
-	except Exception, ex:
+	except Exception as ex:
 		print("[InfoBarGenerics] Failed to load resumepoints:", ex)
 		return {}
 

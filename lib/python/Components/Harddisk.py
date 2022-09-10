@@ -850,8 +850,8 @@ class HarddiskManager:
 		try:
 			if os.path.exists("/dev/" + blockdev):
 				open("/dev/" + blockdev).close()
-		except IOError, err:
-			if err.errno == 159: # no medium present
+		except OSError as err:
+			if err.errno == 159:  # no medium present
 				medium_found = False
 
 		return error, blacklisted, removable, is_cdrom, partitions, medium_found

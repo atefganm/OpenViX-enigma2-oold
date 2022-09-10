@@ -1,3 +1,4 @@
+#include <linux/ioctl.h>
 #include <linux/dvb/frontend.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/version.h>
@@ -27,6 +28,8 @@ DEFINE_REF(eDVBRegisteredFrontend);
 DEFINE_REF(eDVBRegisteredDemux);
 
 DEFINE_REF(eDVBAllocatedFrontend);
+
+int fd0lock = -1;
 
 void eDVBRegisteredFrontend::closeFrontend()
 {
@@ -352,11 +355,13 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 : eDVBAdapterLinux(nr)
 {
 	int file;
-	char type[8];
-	struct dvb_frontend_info fe_info;
+	char type[8] = {};
+	struct dvb_frontend_info fe_info = {};
+	struct dtv_properties props = {};
+	struct dtv_property prop[1] = {};
 	int frontend = -1;
-	char filename[256];
-	char name[128] = {0};
+	char filename[256] = {};
+	char name[128] = {};
 	int vtunerid = nr - 1;
 
 	pumpThread = 0;
@@ -412,10 +417,6 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 		goto error;
 	}
 
-	struct dtv_properties props;
-	struct dtv_property prop[1];
-#ifdef HAVE_OLDE2_API
-#if defined DTV_ENUM_DELSYS
 	prop[0].cmd = DTV_ENUM_DELSYS;
 	memset(prop[0].u.buffer.data, 0, sizeof(prop[0].u.buffer.data));
 	prop[0].u.buffer.len = 0;
@@ -424,17 +425,7 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 
 	if (ioctl(frontend, FE_GET_PROPERTY, &props) < 0)
 		eDebug("[eDVBUsbAdapter] FE_GET_PROPERTY DTV_ENUM_DELSYS failed %m");
-#endif
-#else
-	prop[0].cmd = DTV_ENUM_DELSYS;
-	memset(prop[0].u.buffer.data, 0, sizeof(prop[0].u.buffer.data));
-	prop[0].u.buffer.len = 0;
-	props.num = 1;
-	props.props = prop;
 
-	if (ioctl(frontend, FE_GET_PROPERTY, &props) < 0)
-		eDebug("[eDVBUsbAdapter] FE_GET_PROPERTY DTV_ENUM_DELSYS failed %m");
-#endif
 	::close(frontend);
 	frontend = -1;
 
@@ -510,28 +501,33 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 		goto error;
 	}
 
-#define VTUNER_GET_MESSAGE  1
-#define VTUNER_SET_RESPONSE 2
-#define VTUNER_SET_NAME     3
-#define VTUNER_SET_TYPE     4
-#define VTUNER_SET_HAS_OUTPUTS 5
-#define VTUNER_SET_FE_INFO  6
-#define VTUNER_SET_NUM_MODES 7
-#define VTUNER_SET_MODES 8
-#define VTUNER_SET_DELSYS 32
-#define VTUNER_SET_ADAPTER 33
+#if _IOC_NONE > 0		/* MIPS receivers return _IOC_NONE=1 */
+#define VTUNER_GET_MESSAGE      1
+#define VTUNER_SET_RESPONSE     2
+#define VTUNER_SET_NAME         3
+#define VTUNER_SET_TYPE         4
+#define VTUNER_SET_HAS_OUTPUTS  5
+#define VTUNER_SET_FE_INFO      6
+#define VTUNER_SET_NUM_MODES    7
+#define VTUNER_SET_MODES        8
+#else				/* ARM receivers return _IOC_NONE=0 */
+#define VTUNER_GET_MESSAGE     11
+#define VTUNER_SET_RESPONSE    12
+#define VTUNER_SET_NAME        13
+#define VTUNER_SET_TYPE        14
+#define VTUNER_SET_HAS_OUTPUTS 15
+#define VTUNER_SET_FE_INFO     16
+#define VTUNER_SET_NUM_MODES   17
+#define VTUNER_SET_MODES       18
+#endif
+#define VTUNER_SET_DELSYS      32
+#define VTUNER_SET_ADAPTER     33
+
 	ioctl(vtunerFd, VTUNER_SET_NAME, name);
 	ioctl(vtunerFd, VTUNER_SET_TYPE, type);
 	ioctl(vtunerFd, VTUNER_SET_FE_INFO, &fe_info);
-#ifdef HAVE_OLDE2_API
-#if defined DTV_ENUM_DELSYS
 	if (prop[0].u.buffer.len > 0)
 		ioctl(vtunerFd, VTUNER_SET_DELSYS, prop[0].u.buffer.data);
-#endif
-#else
-	if (prop[0].u.buffer.len > 0)
-		ioctl(vtunerFd, VTUNER_SET_DELSYS, prop[0].u.buffer.data);
-#endif
 	ioctl(vtunerFd, VTUNER_SET_HAS_OUTPUTS, "no");
 	ioctl(vtunerFd, VTUNER_SET_ADAPTER, nr);
 
@@ -631,7 +627,7 @@ void *eDVBUsbAdapter::vtunerPump()
 		{
 			if (FD_ISSET(vtunerFd, &xset))
 			{
-				struct vtuner_message message;
+				struct vtuner_message message = {};
 				memset(message.pidlist, 0xff, sizeof(message.pidlist));
 				::ioctl(vtunerFd, VTUNER_GET_MESSAGE, &message);
 
@@ -673,7 +669,7 @@ void *eDVBUsbAdapter::vtunerPump()
 						}
 						else
 						{
-							struct dmx_pes_filter_params filter;
+							struct dmx_pes_filter_params filter = {};
 							filter.input = DMX_IN_FRONTEND;
 							filter.flags = 0;
 							filter.pid = message.pidlist[i];
@@ -786,7 +782,7 @@ PyObject *eDVBResourceManager::setFrontendSlotInformations(ePyObject list)
 {
 	if (!PyList_Check(list))
 	{
-		PyErr_SetString(PyExc_StandardError, "eDVBResourceManager::setFrontendSlotInformations argument should be a python list");
+		PyErr_SetString(PyExc_Exception, "eDVBResourceManager::setFrontendSlotInformations argument should be a python list");
 		return NULL;
 	}
 	unsigned int assigned=0;
@@ -803,9 +799,9 @@ PyObject *eDVBResourceManager::setFrontendSlotInformations(ePyObject list)
 			Enabled = PyTuple_GET_ITEM(obj, 2);
 			IsDVBS2 = PyTuple_GET_ITEM(obj, 3);
 			frontendId = PyTuple_GET_ITEM(obj, 4);
-			if (!PyInt_Check(Id) || !PyString_Check(Descr) || !PyBool_Check(Enabled) || !PyBool_Check(IsDVBS2) || !PyInt_Check(frontendId))
+			if (!PyLong_Check(Id) || !PyUnicode_Check(Descr) || !PyBool_Check(Enabled) || !PyBool_Check(IsDVBS2) || !PyLong_Check(frontendId))
 				continue;
-			if (!i->m_frontend->setSlotInfo(PyInt_AsLong(Id), PyString_AS_STRING(Descr), Enabled == Py_True, IsDVBS2 == Py_True, PyInt_AsLong(frontendId)))
+			if (!i->m_frontend->setSlotInfo(PyLong_AsLong(Id), PyUnicode_AsUTF8(Descr), Enabled == Py_True, IsDVBS2 == Py_True, PyLong_AsLong(frontendId)))
 				continue;
 			++assigned;
 			break;
@@ -828,9 +824,9 @@ PyObject *eDVBResourceManager::setFrontendSlotInformations(ePyObject list)
 			Enabled = PyTuple_GET_ITEM(obj, 2);
 			IsDVBS2 = PyTuple_GET_ITEM(obj, 3);
 			frontendId = PyTuple_GET_ITEM(obj, 4);
-			if (!PyInt_Check(Id) || !PyString_Check(Descr) || !PyBool_Check(Enabled) || !PyBool_Check(IsDVBS2) || !PyInt_Check(frontendId))
+			if (!PyLong_Check(Id) || !PyUnicode_Check(Descr) || !PyBool_Check(Enabled) || !PyBool_Check(IsDVBS2) || !PyLong_Check(frontendId))
 				continue;
-			if (!i->m_frontend->setSlotInfo(PyInt_AsLong(Id), PyString_AS_STRING(Descr), Enabled == Py_True, IsDVBS2 == Py_True, PyInt_AsLong(frontendId)))
+			if (!i->m_frontend->setSlotInfo(PyLong_AsLong(Id), PyUnicode_AsUTF8(Descr), Enabled == Py_True, IsDVBS2 == Py_True, PyLong_AsLong(frontendId)))
 				continue;
 			break;
 		}
@@ -862,18 +858,10 @@ bool eDVBResourceManager::frontendIsCompatible(int index, const char *type)
 			}
 			else if (!strcmp(type, "DVB-C"))
 			{
-#ifdef HAVE_OLDE2_API
-#if DVB_API_VERSION > 5 || DVB_API_VERSION == 5 && DVB_API_VERSION_MINOR >= 6
-				return i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_A, false) || i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_C, false);
-#else
-				return i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_AC, false);
-#endif
-#else
 #if defined SYS_DVBC_ANNEX_A
 				return i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_A, false) || i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_C, false);
 #else
 				return i->m_frontend->supportsDeliverySystem(SYS_DVBC_ANNEX_AC, false);
-#endif
 #endif
 			}
 			else if (!strcmp(type, "ATSC"))
@@ -934,20 +922,11 @@ void eDVBResourceManager::setFrontendType(int index, const char *types)
 			}
 			else if (type == "DVB-C")
 			{
-#ifdef HAVE_OLDE2_API
-#if DVB_API_VERSION > 5 || DVB_API_VERSION == 5 && DVB_API_VERSION_MINOR >= 6
-				whitelist.push_back(SYS_DVBC_ANNEX_A);
-				whitelist.push_back(SYS_DVBC_ANNEX_C);
-#else
-				whitelist.push_back(SYS_DVBC_ANNEX_AC);
-#endif
-#else
 #if defined SYS_DVBC_ANNEX_A
 				whitelist.push_back(SYS_DVBC_ANNEX_A);
 				whitelist.push_back(SYS_DVBC_ANNEX_C);
 #else
 				whitelist.push_back(SYS_DVBC_ANNEX_AC);
-#endif
 #endif
 			}
 			else if (type == "ATSC")
@@ -1027,7 +1006,10 @@ RESULT eDVBResourceManager::allocateFrontend(ePtr<eDVBAllocatedFrontend> &fe, eP
 		}
 
 		if (c)	/* if we have at least one frontend which is compatible with the source, flag this. */
+		{
+			// eDebug("[eDVBResourceManager] allocateFrontend, score=%d", c);
 			foundone = 1;
+		}
 
 		if (!i->m_inuse)
 		{
@@ -1416,7 +1398,7 @@ RESULT eDVBResourceManager::removeChannel(eDVBChannel *ch)
 	return -ENOENT;
 }
 
-RESULT eDVBResourceManager::connectChannelAdded(const sigc::slot1<void,eDVBChannel*> &channelAdded, ePtr<eConnection> &connection)
+RESULT eDVBResourceManager::connectChannelAdded(const sigc::slot<void(eDVBChannel*)> &channelAdded, ePtr<eConnection> &connection)
 {
 	connection = new eConnection((eDVBResourceManager*)this, m_channelAdded.connect(channelAdded));
 	return 0;
@@ -1483,10 +1465,8 @@ int tuner_type_channel_default(ePtr<iDVBChannelList> &channellist, const eDVBCha
 						return 40000;
 					case iDVBFrontend::feTerrestrial:
 						return 30000;
-#ifndef HAVE_OLDE2_API
 					case iDVBFrontend::feATSC:
 						return 20000;
-#endif
 					default:
 						break;
 				}
@@ -1794,8 +1774,13 @@ void eDVBChannel::cueSheetEvent(int event)
 				eDebug("[eDVBChannel] skipmode ratio is %lld:90000, bitrate is %d bit/s", m_cue->m_skipmode_ratio, bitrate);
 						/* i agree that this might look a bit like black magic. */
 				m_skipmode_n = 512*1024; /* must be 1 iframe at least. */
-				m_skipmode_m = bitrate / 8 / 90000 * m_cue->m_skipmode_ratio / 8;
+// The / and * are done in order, resulting in a distinct integer
+// truncation after bitrate / 8 / 90000
+// I don't think that this is intended...
+// github.com/OpenViX/enigma2/commit/33d172b5a3ad1b22d69ce60c2102552537b77929
+//				m_skipmode_m = bitrate / 8 / 90000 * m_cue->m_skipmode_ratio / 8;
 				m_skipmode_frames = m_cue->m_skipmode_ratio / 90000;
+				m_skipmode_m = (bitrate / 8) * (m_skipmode_frames / 8);
 				m_skipmode_frames_remainder = 0;
 
 				if (m_cue->m_skipmode_ratio < 0)
@@ -1893,7 +1878,7 @@ void eDVBChannel::getNextSourceSpan(off_t current_offset, size_t bytes_read, off
 	if (m_skipmode_m)
 	{
 		int frames_to_skip = m_skipmode_frames + m_skipmode_frames_remainder;
-		//eDebug("[eDVBChannel] we are at %llu, and we try to skip %d+%d frames from here", current_offset, m_skipmode_frames, m_skipmode_frames_remainder);
+		//eDebug("[eDVBChannel] we are at %lld, and we try to skip %d+%d frames from here", current_offset, m_skipmode_frames, m_skipmode_frames_remainder);
 		size_t iframe_len;
 		off_t iframe_start = current_offset;
 		int frames_skipped = frames_to_skip;
@@ -2064,13 +2049,13 @@ void eDVBChannel::getNextSourceSpan(off_t current_offset, size_t bytes_read, off
 					/* when skipping reverse, however, choose the zone before. */
 					/* This returns a size 0 block, in case you noticed... */
 				--i;
-				eDebug("[eDVBChannel] skip to previous block, which is %ju..%ju", i->first, i->second);
+				eDebug("[eDVBChannel] skip to previous block, which is %jd..%jd", (intmax_t)i->first, (intmax_t)i->second);
 				size_t len = diff_upto(i->second, i->first, max);
 				start = i->second - len;
 				eDebug("[eDVBChannel] skipping to %jd, %zd", (intmax_t)start, len);
 			}
 
-			eDebug("[eDVBChannel] result: %jd, %zx (%ju %ju)", (intmax_t)start, size, i->first, i->second);
+			eDebug("[eDVBChannel] result: %jd, %zx (%jd %jd)", (intmax_t)start, size, (intmax_t)i->first, (intmax_t)i->second);
 			return;
 		}
 	}
@@ -2152,13 +2137,13 @@ RESULT eDVBChannel::setChannel(const eDVBChannelID &channelid, ePtr<iDVBFrontend
 	return 0;
 }
 
-RESULT eDVBChannel::connectStateChange(const sigc::slot1<void,iDVBChannel*> &stateChange, ePtr<eConnection> &connection)
+RESULT eDVBChannel::connectStateChange(const sigc::slot<void(iDVBChannel*)> &stateChange, ePtr<eConnection> &connection)
 {
 	connection = new eConnection((iDVBChannel*)this, m_stateChanged.connect(stateChange));
 	return 0;
 }
 
-RESULT eDVBChannel::connectEvent(const sigc::slot2<void,iDVBChannel*,int> &event, ePtr<eConnection> &connection)
+RESULT eDVBChannel::connectEvent(const sigc::slot<void(iDVBChannel*,int)> &event, ePtr<eConnection> &connection)
 {
 	connection = new eConnection((iDVBChannel*)this, m_event.connect(event));
 	return 0;
@@ -2490,7 +2475,7 @@ void eCueSheet::setDecodingDemux(iDVBDemux *demux, iTSMPEGDecoder *decoder)
 	m_decoder = decoder;
 }
 
-RESULT eCueSheet::connectEvent(const sigc::slot1<void,int> &event, ePtr<eConnection> &connection)
+RESULT eCueSheet::connectEvent(const sigc::slot<void(int)> &event, ePtr<eConnection> &connection)
 {
 	connection = new eConnection(this, m_event.connect(event));
 	return 0;

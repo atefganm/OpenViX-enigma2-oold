@@ -49,23 +49,22 @@ class SoftwareUpdateChanges(CommitInfo):
 
 class UpdateChoices(ChoiceBox):
 	def __init__(self, session, title="", list=None, keys=None, selection=0, skin_name=None, text="", reorderConfig="", var=""):
-		print('title:', title)
+		print 'title:', title
 		ChoiceBox.__init__(self, session, title, list, keys, selection, skin_name, text, reorderConfig, var)
-		print('title:', title)
+		print 'title:', title
 
-		self.var = None
-		if var and var in ("unstable", "updating", "stable", "unknown", "alien", "developer"):
+		if var and var in ('unstable', 'updating', 'stable', 'unknown'):
 			self.var = var
-		self['feedStatusMSG'] = Label()
-		self['tl_off'] = Pixmap()
-		self['tl_red'] = Pixmap()
-		self['tl_yellow'] = Pixmap()
-		self['tl_green'] = Pixmap()
-		self['tl_off'].hide()
-		self['tl_red'].hide()
-		self['tl_yellow'].hide()
-		self['tl_green'].hide()
+			self['feedStatusMSG'] = Label()
+			self['tl_off'] = Pixmap()
+			self['tl_red'] = Pixmap()
+			self['tl_yellow'] = Pixmap()
+			self['tl_green'] = Pixmap()
 
+		self["menuActions"] = NumberActionMap(["MenuActions"],
+		{
+			"menu": self.opensettings
+		}, prio=-3) # Override ChoiceBox "menu" action
 		self.onShown.append(self.onshow)
 
 	def onshow(self):
@@ -80,7 +79,7 @@ class UpdateChoices(ChoiceBox):
 			self['tl_red'].hide()
 			self['tl_yellow'].hide()
 			self['tl_green'].hide()
-			if self.var in ("unstable", "alien", "developer"):
+			if self.var == 'unstable':
 				self['tl_red'].show()
 			elif self.var == 'updating':
 				self['tl_yellow'].show()
@@ -88,6 +87,10 @@ class UpdateChoices(ChoiceBox):
 				self['tl_green'].show()
 			else:
 				self['tl_off'].show()
+
+	def opensettings(self):
+		from Screens.Setup import Setup
+		self.session.open(Setup, "softwareupdate")
 
 	def cancelClick(self, dummy=False):
 		self.close()
@@ -151,17 +154,18 @@ class UpdatePlugin(Screen, ProtectedScreen):
 			self['feedStatusMSG'].setText(status_text)
 		if self.trafficLight == 'stable':
 			self['tl_green'].show()
-		elif self.trafficLight in ("unstable", "alien", "developer"):
+		elif self.trafficLight == 'unstable':
 			self['tl_red'].show()
 		elif self.trafficLight == 'updating':
 			self['tl_yellow'].show()
 		else:
 			self['tl_off'].show()
-		if (getImageType() != 'release' and self.trafficLight not in  ("unknown", "alien", "developer")) or (getImageType() == 'release' and self.trafficLight not in ("stable", "unstable", "alien", "developer")):
+
+		if (getImageType() != 'release' and self.trafficLight != 'unknown') or (getImageType() == 'release' and self.trafficLight not in ('stable', 'unstable')):
 			self.session.openWithCallback(self.close, MessageBox, feedsstatuscheck.getFeedsErrorMessage(), type=MessageBox.TYPE_INFO, timeout=30, close_on_any_key=True)
 			return
 		else:
-			if getImageType() != 'release' or (config.softwareupdate.updateisunstable.value == 1 and config.softwareupdate.updatebeta.value) or config.softwareupdate.updateisunstable.value == 0:
+			if getImageType() != 'release' or (config.softwareupdate.updateisunstable.value == '1' and config.softwareupdate.updatebeta.value) or config.softwareupdate.updateisunstable.value == '0':
 				if kernelMismatch():
 					self.session.openWithCallback(self.close, MessageBox, _("The Linux kernel has changed, an update is not permitted. \nInstall latest image using USB stick or Image Manager."), type=MessageBox.TYPE_INFO, timeout=30, close_on_any_key=True)
 					return
@@ -219,6 +223,8 @@ class UpdatePlugin(Screen, ProtectedScreen):
 		if event == IpkgComponent.EVENT_DOWNLOAD:
 			self.status.setText(_("Downloading"))
 		elif event == IpkgComponent.EVENT_UPGRADE:
+			if self.sliderPackages.has_key(param):
+				self.slider.setValue(self.sliderPackages[param])
 			if param in self.sliderPackages:
 				self.slider.setValue(self.sliderPackages[param])
 			self.package.setText(param)
@@ -260,13 +266,13 @@ class UpdatePlugin(Screen, ProtectedScreen):
 				self.ipkg.startCmd(IpkgComponent.CMD_UPGRADE_LIST)
 			elif self.ipkg.currentCommand == IpkgComponent.CMD_UPGRADE_LIST:
 				self.total_packages = None
-				if getImageType() != 'release' or (config.softwareupdate.updateisunstable.value == 1 and config.softwareupdate.updatebeta.value):
+				if getImageType() != 'release' or (config.softwareupdate.updateisunstable.value == '1' and config.softwareupdate.updatebeta.value):
 					self.total_packages = len(self.ipkg.getFetchedList())
 					message = _("The current update may be unstable") + "\n" + _("Are you sure you want to update your %s %s ?") % (getMachineBrand(), getMachineName()) + "\n(" + (ngettext("%s updated package available", "%s updated packages available", self.total_packages) % self.total_packages) + ")"
-				elif config.softwareupdate.updateisunstable.value == 0:
+				elif config.softwareupdate.updateisunstable.value == '0':
 					self.total_packages = len(self.ipkg.getFetchedList())
 					message = _("Do you want to update your %s %s ?") % (getMachineBrand(), getMachineName()) + "\n(" + (ngettext("%s updated package available", "%s updated packages available", self.total_packages) % self.total_packages) + ")"
-				if self.total_packages is not None and self.total_packages > 150:
+				if self.total_packages > 150:
 					message += " " + _("Reflash recommended!")
 				if self.total_packages:
 					global ocram
@@ -329,7 +335,7 @@ class UpdatePlugin(Screen, ProtectedScreen):
 			if 'enigma2-plugin-settings-' in param[0] and self.channellist_only > 0:
 				self.channellist_name = param[0]
 				self.channellist_only = 2
-		#print( event, "-", param)
+		#print event, "-", param
 		pass
 
 	def setEndMessage(self, txt):
@@ -345,9 +351,9 @@ class UpdatePlugin(Screen, ProtectedScreen):
 			return
 
 		if answer[1] == "menu":
-			if config.softwareupdate.updateisunstable.value == 1:
+			if config.softwareupdate.updateisunstable.value == '1':
 				message = _("The current update may be unstable") + "\n" + _("Are you sure you want to update your %s %s ?") % (getMachineBrand(), getMachineName()) + "\n(%s " % self.total_packages + _("Packages") + ")"
-			elif config.softwareupdate.updateisunstable.value == 0:
+			elif config.softwareupdate.updateisunstable.value == '0':
 				message = _("Do you want to update your %s %s ?") % (getMachineBrand(), getMachineName()) + "\n(%s " % self.total_packages + _("Packages") + ")"
 			choices = [(_("View the changes"), "changes"),
 				(_("Upgrade and reboot system"), "cold")]
@@ -381,8 +387,9 @@ class UpdatePlugin(Screen, ProtectedScreen):
 		self.ipkg.write(res and "N" or "Y")
 
 	def doSettingsBackup(self):
+		backup = None
 		from Plugins.SystemPlugins.ViX.BackupManager import BackupFiles
-		self.BackupFiles = BackupFiles(self.session, backuptype=BackupFiles.TYPE_SOFTWAREUPDATE)
+		self.BackupFiles = BackupFiles(self.session, True)
 		Components.Task.job_manager.AddJob(self.BackupFiles.createBackupJob())
 		Components.Task.job_manager.in_background = False
 		for job in Components.Task.job_manager.getPendingJobs():

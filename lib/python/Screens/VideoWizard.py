@@ -1,8 +1,8 @@
-from boxbranding import getBoxType, getMachineName, getHaveRCA, getHaveDVI, getHaveSCART, getHaveAVJACK
 from Screens.Wizard import WizardSummary
 from Screens.WizardLanguage import WizardLanguage
 from Screens.Rc import Rc
-from Components.AVSwitch import iAVSwitch as iAV
+from Components.AVSwitch import iAVSwitch
+from Screens.Screen import Screen
 
 from Components.Pixmap import Pixmap
 from Components.config import config, ConfigBoolean, configfile
@@ -13,8 +13,26 @@ from Tools.HardwareInfo import HardwareInfo
 
 config.misc.showtestcard = ConfigBoolean(default=False)
 
+has_rca = False
+has_dvi = False
+has_jack = False
+has_scart = False
+has_rca = SystemInfo["HaveRCA"]
+has_dvi = SystemInfo["HaveDVI"]
+has_jack = SystemInfo["HaveAVJACK"]
+has_scart = SystemInfo["HAVESCART"]
 
 class VideoWizardSummary(WizardSummary):
+	skin = (
+	"""<screen name="VideoWizardSummary" position="0,0" size="132,64">
+		<widget name="text" position="6,4" size="120,40" font="Regular;12" transparent="1" />
+		<widget source="parent.list" render="Label" position="6,40" size="120,21" font="Regular;14">
+			<convert type="StringListSelection" />
+		</widget>
+		<!--widget name="pic" pixmap="%s" position="6,22" zPosition="10" size="64,64" transparent="1" alphatest="on"/-->
+	</screen>""")
+	#% (resolveFilename(SCOPE_PLUGINS, "SystemPlugins/Videomode/lcd_Scart.png"))
+
 	def __init__(self, session, parent):
 		WizardSummary.__init__(self, session, parent)
 
@@ -52,50 +70,55 @@ class VideoWizard(WizardLanguage, Rc):
 	def __init__(self, session):
 		# FIXME anyone knows how to use relative paths from the plugin's directory?
 		self.xmlfile = resolveFilename(SCOPE_SKIN, "videowizard.xml")
-		self.hw = iAV		# needed by VideoWizard.xml do not change
+		self.hw = iAVSwitch
+
 		WizardLanguage.__init__(self, session, showSteps=False, showStepSlider=False)
 		Rc.__init__(self)
 		self["wizard"] = Pixmap()
+		self["HelpWindow"] = Pixmap()
+		self["HelpWindow"].hide()
 		self["portpic"] = Pixmap()
+		#Screen.setTitle(self, _("Welcome..."))
+		Screen.setTitle(self, _("VideoWizard"))
 
 		self.port = None
 		self.mode = None
 		self.rate = None
 
 	def createSummary(self):
-		print("[VideoWizard] createSummary")
 		return VideoWizardSummary
 
 	def markDone(self):
-		iAV.saveMode(self.port, self.mode, self.rate)
+		self.hw.saveMode(self.port, self.mode, self.rate)
 		config.misc.videowizardenabled.value = 0
 		config.misc.videowizardenabled.save()
 		configfile.save()
 
 	def listInputChannels(self):
-		# hw_type = HardwareInfo().get_device_name()
-		# has_hdmi = HardwareInfo().has_hdmi()
+		hw_type = HardwareInfo().get_device_name()
+		has_hdmi = HardwareInfo().has_hdmi()
 		list = []
-		for port in iAV.getPortList():
-			if iAV.isPortUsed(port):
+
+		for port in self.hw.getPortList():
+			if self.hw.isPortUsed(port):
 				descr = port
 				if descr == "Scart" and not SystemInfo["hasScart"]:
 					continue
 				if port != "DVI-PC":
 					list.append((descr, port))
 		list.sort(key=lambda x: x[0])
-		print("[VideoWizard] listInputChannels:", list)
+		print "[VideoWizard] listInputChannels:", list
 		return list
 
 	def inputSelectionMade(self, index):
-		print("[VideoWizard] inputSelectionMade:", index)
+		print "[VideoWizard] inputSelectionMade:", index
 		self.port = index
 		self.inputSelect(index)
 
 	def inputSelectionMoved(self):
-		# hw_type = HardwareInfo().get_device_name()
-		# has_hdmi = HardwareInfo().has_hdmi()
-		print("[VideoWizard] input selection moved:", self.selection)
+		hw_type = HardwareInfo().get_device_name()
+		has_hdmi = HardwareInfo().has_hdmi()
+		print "[VideoWizard] input selection moved:", self.selection
 		self.inputSelect(self.selection)
 		if self["portpic"].instance is not None:
 			picname = self.selection
@@ -106,52 +129,54 @@ class VideoWizard(WizardLanguage, Rc):
 			self["portpic"].instance.setPixmapFromFile(resolveFilename(SCOPE_CURRENT_SKIN, "icons/%s.png" % picname))
 
 	def inputSelect(self, port):
-		print("[VideoWizard] inputSelect:", port)
-		modeList = iAV.getModeList(self.selection)
-		print("[VideoWizard] modeList:", modeList)
+		print "[VideoWizard] inputSelect:", port
+		modeList = self.hw.getModeList(self.selection)
+		print "[VideoWizard] modeList:", modeList
 		self.port = port
 		if len(modeList) > 0:
 			ratesList = self.listRates(modeList[0][0])
-			iAV.setMode(port=port, mode=modeList[0][0], rate=ratesList[0][0])
+			self.hw.setMode(port=port, mode=modeList[0][0], rate=ratesList[0][0])
 
 	def listModes(self):
 		list = []
-		print("[VideoWizard] modes for port", self.port)
-		for mode in iAV.getModeList(self.port):
-			# if mode[0] != "PC":
-			list.append((mode[0], mode[0]))
-		print("[VideoWizard] modeslist:", list)
+		print "modes for port", self.port
+		for mode in self.hw.getModeList(self.port):
+			#if mode[0] != "PC":
+				list.append((mode[0], mode[0]))
+		print "modeslist:", list
 		return list
 
 	def modeSelectionMade(self, index):
-		print("[VideoWizard] modeSelectionMade:", index)
+		print "modeSelectionMade:", index
 		self.mode = index
 		self.modeSelect(index)
 
 	def modeSelectionMoved(self):
-		print("[VideoWizard] mode selection moved:", self.selection)
+		print "mode selection moved:", self.selection
 		self.modeSelect(self.selection)
 
 	def modeSelect(self, mode):
 		ratesList = self.listRates(mode)
-		print("[VideoWizard] ratesList:", ratesList)
-		if self.port == "HDMI" and mode in ("720p", "1080i", "1080p", "2160p"):
+		print "ratesList:", ratesList
+		if self.port == "HDMI" and mode in ("720p", "1080i", "1080p"):
 			self.rate = "multi"
-			iAV.setMode(port=self.port, mode=mode, rate="multi")
+			self.hw.setMode(port=self.port, mode=mode, rate="multi")
 		else:
-			iAV.setMode(port=self.port, mode=mode, rate=ratesList[0][0])
+			self.hw.setMode(port=self.port, mode=mode, rate=ratesList[0][0])
 
 	def listRates(self, querymode=None):
 		if querymode is None:
 			querymode = self.mode
 		list = []
-		print("[VideoWizard] modes for port", self.port, "and mode", querymode)
-		for mode in iAV.getModeList(self.port):
-			print("[VideoWizard] mode:", mode)
+		print "modes for port", self.port, "and mode", querymode
+		for mode in self.hw.getModeList(self.port):
+			print mode
 			if mode[0] == querymode:
 				for rate in mode[1]:
+					if rate in ("auto") and not SystemInfo["have24hz"]:
+						continue
 					if self.port == "DVI-PC":
-						print("[VideoWizard] rate:", rate)
+						print "rate:", rate
 						if rate == "640x480":
 							list.insert(0, (rate, rate))
 							continue
@@ -159,21 +184,21 @@ class VideoWizard(WizardLanguage, Rc):
 		return list
 
 	def rateSelectionMade(self, index):
-		print("[VideoWizard] rateSelectionMade:", index)
+		print "rateSelectionMade:", index
 		self.rate = index
 		self.rateSelect(index)
 
 	def rateSelectionMoved(self):
-		print("[VideoWizard] rate selection moved:", self.selection)
+		print "rate selection moved:", self.selection
 		self.rateSelect(self.selection)
 
 	def rateSelect(self, rate):
-		iAV.setMode(port=self.port, mode=self.mode, rate=rate)
+		self.hw.setMode(port=self.port, mode=self.mode, rate=rate)
 
 	def showTestCard(self, selection=None):
 		if selection is None:
 			selection = self.selection
-		print("[VideoWizard] set config.misc.showtestcard to", {"yes": True, "no": False}[selection])
+		print "set config.misc.showtestcard to", {'yes': True, 'no': False}[selection]
 		if selection == "yes":
 			config.misc.showtestcard.value = True
 		else:
@@ -182,12 +207,12 @@ class VideoWizard(WizardLanguage, Rc):
 	def keyNumberGlobal(self, number):
 		if number in (1, 2, 3):
 			if number == 1:
-				iAV.saveMode("HDMI", "720p", "multi")
+				self.hw.saveMode("HDMI", "720p", "multi")
 			elif number == 2:
-				iAV.saveMode("HDMI", "1080i", "multi")
+				self.hw.saveMode("HDMI", "1080i", "multi")
 			elif number == 3:
-				iAV.saveMode("Scart", "Multi", "multi")
-			iAV.setConfiguredMode()
+				self.hw.saveMode("Scart", "Multi", "multi")
+			self.hw.setConfiguredMode()
 			self.close()
 
 		WizardLanguage.keyNumberGlobal(self, number)

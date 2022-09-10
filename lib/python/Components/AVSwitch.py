@@ -157,7 +157,7 @@ class AVSwitch:
 			modes = f.read()[:-1]
 			f.close()
 		except IOError:
-			print "[VideoHardware] couldn't read available videomodes."
+			print("[VideoHardware] couldn't read available videomodes.")
 			modes = []
 			return modes
 		return modes.split(' ')

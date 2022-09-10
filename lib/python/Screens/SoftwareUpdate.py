@@ -49,9 +49,9 @@ class SoftwareUpdateChanges(CommitInfo):
 
 class UpdateChoices(ChoiceBox):
 	def __init__(self, session, title="", list=None, keys=None, selection=0, skin_name=None, text="", reorderConfig="", var=""):
-		print 'title:', title
+		print('title:', title)
 		ChoiceBox.__init__(self, session, title, list, keys, selection, skin_name, text, reorderConfig, var)
-		print 'title:', title
+		print('title:', title)
 
 		if var and var in ('unstable', 'updating', 'stable', 'unknown'):
 			self.var = var

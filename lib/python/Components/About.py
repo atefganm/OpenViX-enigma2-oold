@@ -99,7 +99,7 @@ def getCPUSpeedMHzInt():
 					cpu_speed = float(splitted[1].split(' ')[0])
 					break
 	except IOError:
-		print "[About] getCPUSpeedMHzInt, /proc/cpuinfo not available"
+		print("[About] getCPUSpeedMHzInt, /proc/cpuinfo not available")
 
 	if cpu_speed == 0:
 		if getMachineBuild() in ('h7', 'hd51', 'hd52', 'sf4008'):
@@ -117,7 +117,7 @@ def getCPUSpeedMHzInt():
 				cpu_speed = float(file.read()) / 1000
 				file.close()
 			except IOError:
-				print "[About] getCPUSpeedMHzInt, /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq not available"
+				print("[About] getCPUSpeedMHzInt, /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq not available")
 	return int(cpu_speed)
 
 

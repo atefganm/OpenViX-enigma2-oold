@@ -218,7 +218,7 @@ public:
 		errNoSourceFound = -7,
 	};
 
-	RESULT connectChannelAdded(const sigc::slot1<void,eDVBChannel*> &channelAdded, ePtr<eConnection> &connection);
+	RESULT connectChannelAdded(const sigc::slot<void(eDVBChannel*)> &channelAdded, ePtr<eConnection> &connection);
 	int canAllocateChannel(const eDVBChannelID &channelid, const eDVBChannelID &ignore, int &system, bool simulate=false);
 
 		/* allocate channel... */
@@ -278,8 +278,8 @@ public:
 	RESULT setChannel(const eDVBChannelID &id, ePtr<iDVBFrontendParameters> &feparam);
 	eDVBChannelID getChannelID() { return m_channel_id; }
 
-	RESULT connectStateChange(const sigc::slot1<void,iDVBChannel*> &stateChange, ePtr<eConnection> &connection);
-	RESULT connectEvent(const sigc::slot2<void,iDVBChannel*,int> &eventChange, ePtr<eConnection> &connection);
+	RESULT connectStateChange(const sigc::slot<void(iDVBChannel*)> &stateChange, ePtr<eConnection> &connection);
+	RESULT connectEvent(const sigc::slot<void(iDVBChannel*,int)> &eventChange, ePtr<eConnection> &connection);
 
 	RESULT getState(int &state);
 
@@ -310,8 +310,8 @@ private:
 
 	ePtr<iDVBFrontendParameters> m_current_frontend_parameters;
 	eDVBChannelID m_channel_id;
-	sigc::signal1<void,iDVBChannel*> m_stateChanged;
-	sigc::signal2<void,iDVBChannel*,int> m_event;
+	sigc::signal<void(iDVBChannel*)> m_stateChanged;
+	sigc::signal<void(iDVBChannel*,int)> m_event;
 	int m_state;
 	ePtr<iTsSource> m_source;
 

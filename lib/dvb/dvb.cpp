@@ -1,4 +1,3 @@
-#include <linux/ioctl.h>
 #include <linux/dvb/frontend.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/version.h>
@@ -28,8 +27,6 @@ DEFINE_REF(eDVBRegisteredFrontend);
 DEFINE_REF(eDVBRegisteredDemux);
 
 DEFINE_REF(eDVBAllocatedFrontend);
-
-int fd0lock = -1;
 
 void eDVBRegisteredFrontend::closeFrontend()
 {
@@ -111,8 +108,6 @@ eDVBResourceManager::eDVBResourceManager()
 		adapter->scanDevices();
 		addAdapter(adapter, true);
 	}
-
-	setUsbTuner();
 
 	int fd = open("/proc/stb/info/model", O_RDONLY);
 	char tmp[16];
@@ -211,7 +206,7 @@ eDVBResourceManager::eDVBResourceManager()
 	eDebug("[eDVBResourceManager] found %zd adapter, %zd frontends(%zd sim) and %zd demux, boxtype %d",
 		m_adapter.size(), m_frontend.size(), m_simulate_frontend.size(), m_demux.size(), m_boxtype);
 
-	m_fbc_mng = new eFBCTunerManager(this);
+	m_fbcmng = new eFBCTunerManager(instance);
 
 	CONNECT(m_releaseCachedChannelTimer->timeout, eDVBResourceManager::releaseCachedChannel);
 }
@@ -357,13 +352,11 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 : eDVBAdapterLinux(nr)
 {
 	int file;
-	char type[8] = {};
-	struct dvb_frontend_info fe_info = {};
-	struct dtv_properties props = {};
-	struct dtv_property prop[1] = {};
+	char type[8];
+	struct dvb_frontend_info fe_info;
 	int frontend = -1;
-	char filename[256] = {};
-	char name[128] = {};
+	char filename[256];
+	char name[128] = {0};
 	int vtunerid = nr - 1;
 
 	pumpThread = 0;
@@ -419,6 +412,8 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 		goto error;
 	}
 
+	struct dtv_properties props;
+	struct dtv_property prop[1];
 #ifdef HAVE_OLDE2_API
 #if defined DTV_ENUM_DELSYS
 	prop[0].cmd = DTV_ENUM_DELSYS;
@@ -436,7 +431,7 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 	prop[0].u.buffer.len = 0;
 	props.num = 1;
 	props.props = prop;
- 
+
 	if (ioctl(frontend, FE_GET_PROPERTY, &props) < 0)
 		eDebug("[eDVBUsbAdapter] FE_GET_PROPERTY DTV_ENUM_DELSYS failed %m");
 #endif
@@ -515,17 +510,16 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 		goto error;
 	}
 
-#define VTUNER_GET_MESSAGE      1
-#define VTUNER_SET_RESPONSE     2
-#define VTUNER_SET_NAME         3
-#define VTUNER_SET_TYPE         4
-#define VTUNER_SET_HAS_OUTPUTS  5
-#define VTUNER_SET_FE_INFO      6
-#define VTUNER_SET_NUM_MODES    7
-#define VTUNER_SET_MODES        8
-#define VTUNER_SET_DELSYS      32
-#define VTUNER_SET_ADAPTER     33
-
+#define VTUNER_GET_MESSAGE  1
+#define VTUNER_SET_RESPONSE 2
+#define VTUNER_SET_NAME     3
+#define VTUNER_SET_TYPE     4
+#define VTUNER_SET_HAS_OUTPUTS 5
+#define VTUNER_SET_FE_INFO  6
+#define VTUNER_SET_NUM_MODES 7
+#define VTUNER_SET_MODES 8
+#define VTUNER_SET_DELSYS 32
+#define VTUNER_SET_ADAPTER 33
 	ioctl(vtunerFd, VTUNER_SET_NAME, name);
 	ioctl(vtunerFd, VTUNER_SET_TYPE, type);
 	ioctl(vtunerFd, VTUNER_SET_FE_INFO, &fe_info);
@@ -637,7 +631,7 @@ void *eDVBUsbAdapter::vtunerPump()
 		{
 			if (FD_ISSET(vtunerFd, &xset))
 			{
-				struct vtuner_message message = {};
+				struct vtuner_message message;
 				memset(message.pidlist, 0xff, sizeof(message.pidlist));
 				::ioctl(vtunerFd, VTUNER_GET_MESSAGE, &message);
 
@@ -679,7 +673,7 @@ void *eDVBUsbAdapter::vtunerPump()
 						}
 						else
 						{
-							struct dmx_pes_filter_params filter = {};
+							struct dmx_pes_filter_params filter;
 							filter.input = DMX_IN_FRONTEND;
 							filter.flags = 0;
 							filter.pid = message.pidlist[i];
@@ -792,7 +786,7 @@ PyObject *eDVBResourceManager::setFrontendSlotInformations(ePyObject list)
 {
 	if (!PyList_Check(list))
 	{
-		PyErr_SetString(PyExc_Exception, "eDVBResourceManager::setFrontendSlotInformations argument should be a python list");
+		PyErr_SetString(PyExc_StandardError, "eDVBResourceManager::setFrontendSlotInformations argument should be a python list");
 		return NULL;
 	}
 	unsigned int assigned=0;
@@ -809,9 +803,9 @@ PyObject *eDVBResourceManager::setFrontendSlotInformations(ePyObject list)
 			Enabled = PyTuple_GET_ITEM(obj, 2);
 			IsDVBS2 = PyTuple_GET_ITEM(obj, 3);
 			frontendId = PyTuple_GET_ITEM(obj, 4);
-			if (!PyLong_Check(Id) || !PyUnicode_Check(Descr) || !PyBool_Check(Enabled) || !PyBool_Check(IsDVBS2) || !PyLong_Check(frontendId))
+			if (!PyInt_Check(Id) || !PyString_Check(Descr) || !PyBool_Check(Enabled) || !PyBool_Check(IsDVBS2) || !PyInt_Check(frontendId))
 				continue;
-			if (!i->m_frontend->setSlotInfo(PyLong_AsLong(Id), PyUnicode_AsUTF8(Descr), Enabled == Py_True, IsDVBS2 == Py_True, PyLong_AsLong(frontendId)))
+			if (!i->m_frontend->setSlotInfo(PyInt_AsLong(Id), PyString_AS_STRING(Descr), Enabled == Py_True, IsDVBS2 == Py_True, PyInt_AsLong(frontendId)))
 				continue;
 			++assigned;
 			break;
@@ -834,9 +828,9 @@ PyObject *eDVBResourceManager::setFrontendSlotInformations(ePyObject list)
 			Enabled = PyTuple_GET_ITEM(obj, 2);
 			IsDVBS2 = PyTuple_GET_ITEM(obj, 3);
 			frontendId = PyTuple_GET_ITEM(obj, 4);
-			if (!PyLong_Check(Id) || !PyUnicode_Check(Descr) || !PyBool_Check(Enabled) || !PyBool_Check(IsDVBS2) || !PyLong_Check(frontendId))
+			if (!PyInt_Check(Id) || !PyString_Check(Descr) || !PyBool_Check(Enabled) || !PyBool_Check(IsDVBS2) || !PyInt_Check(frontendId))
 				continue;
-			if (!i->m_frontend->setSlotInfo(PyLong_AsLong(Id), PyUnicode_AsUTF8(Descr), Enabled == Py_True, IsDVBS2 == Py_True, PyLong_AsLong(frontendId)))
+			if (!i->m_frontend->setSlotInfo(PyInt_AsLong(Id), PyString_AS_STRING(Descr), Enabled == Py_True, IsDVBS2 == Py_True, PyInt_AsLong(frontendId)))
 				continue;
 			break;
 		}
@@ -1422,7 +1416,7 @@ RESULT eDVBResourceManager::removeChannel(eDVBChannel *ch)
 	return -ENOENT;
 }
 
-RESULT eDVBResourceManager::connectChannelAdded(const sigc::slot<void(eDVBChannel*)> &channelAdded, ePtr<eConnection> &connection)
+RESULT eDVBResourceManager::connectChannelAdded(const sigc::slot1<void,eDVBChannel*> &channelAdded, ePtr<eConnection> &connection)
 {
 	connection = new eConnection((eDVBResourceManager*)this, m_channelAdded.connect(channelAdded));
 	return 0;

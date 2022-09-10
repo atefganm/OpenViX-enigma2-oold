@@ -321,6 +321,8 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 		goto error;
 	}
 
+	struct dtv_properties props;
+	struct dtv_property prop[1];
 #ifdef HAVE_OLDE2_API
 #if defined DTV_ENUM_DELSYS
 	prop[0].cmd = DTV_ENUM_DELSYS;
@@ -417,7 +419,6 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 		goto error;
 	}
 
-#if _IOC_NONE > 0		/* MIPS receivers return _IOC_NONE=1 */
 #define VTUNER_GET_MESSAGE      1
 #define VTUNER_SET_RESPONSE     2
 #define VTUNER_SET_NAME         3

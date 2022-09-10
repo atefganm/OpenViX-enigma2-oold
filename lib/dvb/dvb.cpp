@@ -111,9 +111,107 @@ eDVBResourceManager::eDVBResourceManager()
 		adapter->scanDevices();
 		addAdapter(adapter, true);
 	}
-	eDebug("[eDVBResourceManager] found %zd adapter, %zd frontends(%zd sim) and %zd demux",
-		m_adapter.size(), m_frontend.size(), m_simulate_frontend.size(), m_demux.size());
-	m_fbcmng = new eFBCTunerManager(instance);
+
+	setUsbTuner();
+
+	int fd = open("/proc/stb/info/model", O_RDONLY);
+	char tmp[16];
+	int rd = fd >= 0 ? read(fd, tmp, sizeof(tmp)) : 0;
+	if (fd >= 0)
+		close(fd);
+
+	if (!strncmp(tmp, "dm7025\n", rd))
+		m_boxtype = DM7025;
+	else if (!strncmp(tmp, "dm8000\n", rd))
+		m_boxtype = DM8000;
+	else if (!strncmp(tmp, "dm800\n", rd))
+		m_boxtype = DM800;
+	else if (!strncmp(tmp, "dm500hd\n", rd))
+		m_boxtype = DM500HD;
+	else if (!strncmp(tmp, "dm800se\n", rd))
+		m_boxtype = DM800SE;
+	else if (!strncmp(tmp, "dm7020hd\n", rd))
+		m_boxtype = DM7020HD;
+	else if (!strncmp(tmp, "dm7080\n", rd))
+		m_boxtype = DM7080;
+	else if (!strncmp(tmp, "dm820\n", rd))
+		m_boxtype = DM820;
+	else if (!strncmp(tmp, "dm520\n", rd))
+		m_boxtype = DM520;
+	else if (!strncmp(tmp, "dm525\n", rd))
+		m_boxtype = DM525;
+	else if (!strncmp(tmp, "dm900\n", rd))
+		m_boxtype = DM900;
+	else if (!strncmp(tmp, "dm920\n", rd))
+		m_boxtype = DM920;
+	else if (!strncmp(tmp, "Gigablue\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gb800solo\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gb800se\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gb800ue\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gb800seplus\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gb800ueplus\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbipbox\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbquad\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbquadplus\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbultra\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbultrase\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbultraue\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbultraueh\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbx1\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbx2\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbx3\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbx3h\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbquad4k\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbue4k\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "gbx34k\n", rd))
+		m_boxtype = GIGABLUE;
+	else if (!strncmp(tmp, "ebox5000\n", rd))
+		m_boxtype = DM800;
+	else if (!strncmp(tmp, "ebox5100\n", rd))
+		m_boxtype = DM800;
+	else if (!strncmp(tmp, "eboxlumi\n", rd))
+		m_boxtype = DM800;
+	else if (!strncmp(tmp, "ebox7358\n", rd))
+		m_boxtype = DM800SE;
+	else if (!strncmp(tmp, "wetekplay\n", rd))
+		m_boxtype = WETEKPLAY;
+	else if (!strncmp(tmp, "wetekplay2\n", rd))
+		m_boxtype = WETEKPLAY2;
+	else if (!strncmp(tmp, "wetekhub\n", rd))
+		m_boxtype = WETEKHUB;
+	else {
+		eDebug("[eDVBResourceManager] boxtype detection via /proc/stb/info not possible... use fallback via demux count!");
+		if (m_demux.size() == 3)
+			m_boxtype = DM800;
+		else if (m_demux.size() < 5)
+			m_boxtype = DM7025;
+		else
+			m_boxtype = DM8000;
+	}
+
+	eDebug("[eDVBResourceManager] found %zd adapter, %zd frontends(%zd sim) and %zd demux, boxtype %d",
+		m_adapter.size(), m_frontend.size(), m_simulate_frontend.size(), m_demux.size(), m_boxtype);
+
+	m_fbc_mng = new eFBCTunerManager(this);
 
 	CONNECT(m_releaseCachedChannelTimer->timeout, eDVBResourceManager::releaseCachedChannel);
 }
@@ -321,8 +419,6 @@ eDVBUsbAdapter::eDVBUsbAdapter(int nr)
 		goto error;
 	}
 
-	struct dtv_properties props;
-	struct dtv_property prop[1];
 #ifdef HAVE_OLDE2_API
 #if defined DTV_ENUM_DELSYS
 	prop[0].cmd = DTV_ENUM_DELSYS;
@@ -2062,13 +2158,13 @@ RESULT eDVBChannel::setChannel(const eDVBChannelID &channelid, ePtr<iDVBFrontend
 	return 0;
 }
 
-RESULT eDVBChannel::connectStateChange(const sigc::slot<void(iDVBChannel*)> &stateChange, ePtr<eConnection> &connection)
+RESULT eDVBChannel::connectStateChange(const sigc::slot1<void,iDVBChannel*> &stateChange, ePtr<eConnection> &connection)
 {
 	connection = new eConnection((iDVBChannel*)this, m_stateChanged.connect(stateChange));
 	return 0;
 }
 
-RESULT eDVBChannel::connectEvent(const sigc::slot<void(iDVBChannel*,int)> &event, ePtr<eConnection> &connection)
+RESULT eDVBChannel::connectEvent(const sigc::slot2<void,iDVBChannel*,int> &event, ePtr<eConnection> &connection)
 {
 	connection = new eConnection((iDVBChannel*)this, m_event.connect(event));
 	return 0;
@@ -2400,7 +2496,7 @@ void eCueSheet::setDecodingDemux(iDVBDemux *demux, iTSMPEGDecoder *decoder)
 	m_decoder = decoder;
 }
 
-RESULT eCueSheet::connectEvent(const sigc::slot<void(int)> &event, ePtr<eConnection> &connection)
+RESULT eCueSheet::connectEvent(const sigc::slot1<void,int> &event, ePtr<eConnection> &connection)
 {
 	connection = new eConnection(this, m_event.connect(event));
 	return 0;

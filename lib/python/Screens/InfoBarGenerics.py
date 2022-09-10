@@ -860,7 +860,7 @@ class InfoBarShowHide(InfoBarScreenSaver):
 					service = info and info.getInfoString(service, iServiceInformation.sServiceref)
 					service = service and eServiceReference(service)
 					if service:
-						print service, service and service.toString()
+						print(service, service and service.toString())
 					return service and ":".join(service.toString().split(":")[:11]) in whitelist_vbi
 				else:
 					return ".hidevbi." in servicepath.lower()

@@ -898,7 +898,7 @@ class HarddiskManager:
 				self.cd = devicePath
 				self.partitions.append(Partition(mountpoint=self.getMountpoint(device), description=description, force_mounted=True, device=device))
 				# print "[Harddisk] DEBUG: Partition(mountpoint=%s, description=%s, force_mounted=True, device=%s)" % (self.getMountpoint(device), description, device)
-				print "[Harddisk] Found optical disk '%s' (%s)." % (device, physicalDevice)
+				print("[Harddisk] Found optical disk '%s' (%s)." % (device, physicalDevice))
 			data = readFile(os.path.join(devicePath, "removable"))
 			removable = False if data is None else bool(int(data))
 			# if removable:

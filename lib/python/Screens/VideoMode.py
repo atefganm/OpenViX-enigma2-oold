@@ -298,12 +298,12 @@ class VideoSetup(Screen, ConfigListScreen):
 				config.av.autores_unknownres.setValue(self.last_good_autores_unknownres)
 				try:
 					if not self.current_mode in iAVSwitch.readAvailableModes():
-						raise TypeError, "No old video mode saved!"
+						raise TypeError("No old video mode saved!")
 					f = open("/proc/stb/video/videomode", "w")
 					f.write(self.current_mode)
 					f.close()
 				except Exception as e:
-					print "[VideoMode] failed to set old video mode!", e
+					print("[VideoMode] failed to set old video mode!", e)
 					self.hw.setMode(*self.last_good)
 			self.createSetup()
 		else:

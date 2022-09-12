@@ -1,13 +1,10 @@
-import six
-
-# DO NOT CHANGE THE ORDER OF THESE IMPORTS OR Harddisk will crash!!
 from enigma import getPrevAsciiCode
 from Tools.NumericalTextInput import NumericalTextInput
 from Tools.Directories import resolveFilename, SCOPE_CONFIG, fileExists
 from Components.Harddisk import harddiskmanager
 from Tools.LoadPixmap import LoadPixmap
 from copy import copy as copy_copy
-from os import fsync, path as os_path, rename, sep
+from os import path as os_path
 from time import localtime, strftime, mktime
 
 ACTIONKEY_LEFT = 0

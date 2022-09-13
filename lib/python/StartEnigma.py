@@ -2,11 +2,9 @@ import sys
 import os
 from time import time
 
-if os.path.isfile("/usr/lib/enigma2/python/enigma.zip"):
-	sys.path.append("/usr/lib/enigma2/python/enigma.zip")
-
-from Tools.Profile import profile, profile_final
-profile("PYTHON_START")
+from Tools.Profile import profile, profile_final  # This facilitates the start up progress counter.
+profile("StartPython")
+import Tools.RedirectOutput  # Don't remove this line. This import facilitates connecting stdout and stderr redirections to the log files.
 
 # Don't remove this line. It may seem to do nothing, but if removed,
 # it will break output redirection for crash logs.

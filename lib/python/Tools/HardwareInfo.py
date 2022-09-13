@@ -1,3 +1,4 @@
+from __future__ import print_function
 from boxbranding import getBoxType, getBrandOEM, getMachineName
 from Components.About import about
 
@@ -8,7 +9,7 @@ class HardwareInfo:
 
 	def __init__(self):
 		if HardwareInfo.device_name is not None:
-#			print("using cached result")
+#			print "using cached result"
 			return
 
 		HardwareInfo.device_name = "unknown"
@@ -58,19 +59,8 @@ class HardwareInfo:
 	def get_friendly_name(self):
 		return getMachineName()
 
-	def has_hdmi(self):
-		return not (HardwareInfo.device_name == 'dm800' or (HardwareInfo.device_name == 'dm8000' and HardwareInfo.device_version == None))
-
 	def linux_kernel(self):
 		try:
-			return open("/proc/version","r").read().split(' ', 4)[2].split('-',2)[0]
+			return open("/proc/version", "r").read().split(' ', 4)[2].split('-', 2)[0]
 		except:
 			return "unknown"
-
-	def has_deepstandby(self):
-		return getBoxType() != 'dm800'
-
-	def is_nextgen(self):
-		if about.getCPUString() in ('BCM7346B2', 'BCM7425B2', 'BCM7429B0'):
-			return True
-		return False

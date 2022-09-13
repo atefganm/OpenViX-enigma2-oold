@@ -1,19 +1,15 @@
-from os import R_OK, access, listdir, walk
-from os.path import exists as fileAccess, isdir, isfile, join as pathjoin
-from re import findall
+from hashlib import md5
+from os import listdir, readlink
+from os.path import exists, isfile, join as pathjoin, islink
 from subprocess import PIPE, Popen
-from boxbranding import getBoxType, getBrandOEM, getDisplayType, getHaveAVJACK, getHaveHDMIinFHD, getHaveHDMIinHD, getHaveRCA, getHaveSCART, getHaveSCARTYUV, getHaveYUV, getImageType, getMachineBrand, getMachineBuild, getMachineMtdRoot, getMachineName
-from enigma import Misc_Options, eDVBCIInterfaces, eDVBResourceManager, eGetEnigmaDebugLvl
 
-from Components.About import getChipSetString
-from Components.RcModel import rc_model
-from Tools.BoxConfig import BoxConfig
-from Tools.Directories import SCOPE_SKIN, fileCheck, fileContains, fileReadLine, fileReadLines, resolveFilename, fileExists, fileHas, fileReadLine, pathExists
-from Tools.HardwareInfo import HardwareInfo
+from boxbranding import getBoxType
+from enigma import Misc_Options, eDVBResourceManager, eGetEnigmaDebugLvl
+
+from Tools.Directories import SCOPE_LIBDIR, SCOPE_SKINS, isPluginInstalled, fileCheck, fileReadLines, resolveFilename, fileExists, fileHas, pathExists
+from Tools.MultiBoot import MultiBoot
 
 MODULE_NAME = __name__.split(".")[-1]
-ENIGMA_KERNEL_MODULE = "enigma.ko"
-PROC_PATH = "/proc/enigma"
 
 SystemInfo = {}
 
@@ -174,6 +170,7 @@ DISPLAYMODEL = BoxInfo.getItem("displaymodel")
 # cmdline = fileReadLine("/proc/cmdline", source=MODULE_NAME)
 # cmdline = {k: v.strip('"') for k, v in findall(r'(\S+)=(".*?"|\S+)', cmdline)}
 
+
 def getNumVideoDecoders():
 	numVideoDecoders = 0
 	while fileExists("/dev/dvb/adapter0/video%d" % numVideoDecoders, "f"):
@@ -253,9 +250,83 @@ def Refresh_SysSoftCam():
 	BoxInfo.setItem("ShowCCCamInfo", Check_SysSoftcam() in ("cccam",), True)
 
 
+def GetBoxName():
+	box = getBoxType()
+	machinename = DISPLAYMODEL.lower()
+	if box in ('uniboxhd1', 'uniboxhd2', 'uniboxhd3'):
+		box = "ventonhdx"
+	elif box == "odinm6":
+		box = machinename
+	elif box == "inihde" and machinename == "xpeedlx":
+		box = "xpeedlx"
+	elif box in ('xpeedlx1', 'xpeedlx2'):
+		box = "xpeedlx"
+	elif box == "inihde" and machinename == "hd-1000":
+		box = "sezam-1000hd"
+	elif box == "ventonhdx" and machinename == "hd-5000":
+		box = "sezam-5000hd"
+	elif box == "ventonhdx" and machinename == "premium twin":
+		box = "miraclebox-twin"
+	elif box == "xp1000" and machinename == "sf8 hd":
+		box = "sf8"
+	elif box.startswith('et') and not box in ('et8000', 'et8500', 'et8500s', 'et10000'):
+		box = box[0:3] + 'x00'
+	elif box == "odinm9":
+		box = "maram9"
+	elif box.startswith('sf8008m'):
+		box = "sf8008m"
+	elif box.startswith('sf8008opt'):
+		box = "sf8008opt"
+	elif box.startswith('sf8008'):
+		box = "sf8008"
+	elif box.startswith('ustym4kpro'):
+		box = "ustym4kpro"
+	elif box.startswith('twinboxlcdci'):
+		box = "twinboxlcd"
+	elif box == "sfx6018":
+		box = "sfx6008"
+	return box
+
+
 BoxInfo.setItem("DebugLevel", eGetEnigmaDebugLvl())
 BoxInfo.setItem("InDebugMode", eGetEnigmaDebugLvl() >= 4)
 BoxInfo.setItem("ModuleLayout", getModuleLayout(), immutable=True)
+
+BoxInfo.setItem("RCImage", getRCFile("png"))
+BoxInfo.setItem("RCMapping", getRCFile("xml"))
+BoxInfo.setItem("RemoteEnable", MODEL in ("dm800", "azboxhd"))
+if MODEL in ('maram9', 'classm', 'axodin', 'axodinc', 'starsatlx', 'genius', 'evo', 'galaxym6'):
+	repeat = 400
+elif MODEL == 'azboxhd':
+	repeat = 150
+else:
+	repeat = 100
+BoxInfo.setItem("RemoteRepeat", repeat)
+BoxInfo.setItem("RemoteDelay", 200 if repeat == 400 else 700)
+
+BoxInfo.setItem("HDMI-PreEmphasis", fileExists("/proc/stb/hdmi/preemphasis"))
+
+try:
+	branch = getE2Rev()
+	if "+" in branch:
+		branch = branch.split("+")[1]
+	branch = "?sha=%s" % branch
+except Exception as err:
+	branch = ""
+commitLogs = [
+	("openATV Enigma2", "https://api.github.com/repos/openatv/enigma2/commits%s" % branch),
+	("OE-Alliance Plugins", "https://api.github.com/repos/oe-alliance/oe-alliance-plugins/commits"),
+	("Enigma2 Plugins", "https://api.github.com/repos/oe-alliance/enigma2-plugins/commits"),
+	("OpenWebif", "https://api.github.com/repos/E2OpenPlugins/e2openplugin-OpenWebif/commits"),
+	("MetrixHD Skin", "https://api.github.com/repos/openatv/MetrixHD/commits")
+]
+BoxInfo.setItem("InformationCommitLogs", commitLogs)
+# NOTE: Return the welcome text back to Information.py until SystemInfo can process translation requests.
+#
+# welcome = [
+# 	_("Welcome to %s") % BoxInfo.getItem("displaydistro", "Enigma2")
+# ]
+# BoxInfo.setItem("InformationDistributionWelcome", welcome)
 
 BoxInfo.setItem("12V_Output", Misc_Options.getInstance().detected_12V_output())  #FIXME : Do we need this?
 BoxInfo.setItem("3DMode", fileCheck("/proc/stb/fb/3dmode") or fileCheck("/proc/stb/fb/primary/3d"))

@@ -83,40 +83,41 @@ class VideoSetup(Screen, ConfigListScreen):
 			{
 				"cancel": self.keyCancel,
 				"save": self.apply,
-				"menu": self.closeRecursive,
 			}, -2)
 
 		self["key_red"] = StaticText(_("Cancel"))
-		self["key_green"] = StaticText(_("OK"))
+		self["key_green"] = StaticText(_("Save"))
 		self["description"] = Label("")
 
 		config.av.autores_preview.value = False
 		self.current_mode = None
 		self.createSetup()
 		self.grabLastGoodMode()
-		self.onLayoutFinish.append(self.layoutFinished)
-
-	def layoutFinished(self):
-		self.setTitle(self.setup_title)
+		self["config"].onSelectionChanged.append(self.selectionChanged)
 
 	def startHotplug(self):
-		iAV.on_hotplug.append(self.createSetup)
+		self.hw.on_hotplug.append(self._createSetup)
 
 	def stopHotplug(self):
-		iAV.on_hotplug.remove(self.createSetup)
+		self.hw.on_hotplug.remove(self._createSetup)
+
+	# FIXME
+	def _createSetup(self, what):
+		self.createSetup()
 
 	def createSetup(self):
 		level = config.usage.setup_level.index
+
 		self.list = [
 			getConfigListEntry(_("Video output"), config.av.videoport, _("Configures which video output connector will be used."))
 		]
-		if config.av.videoport.value in ('HDMI', 'YPbPr', 'Scart-YPbPr') and not getAutoresPlugin_enabled(): #path.exists(resolveFilename(SCOPE_PLUGINS)+'SystemPlugins/AutoResolution'):
+		if config.av.videoport.value in ('HDMI', 'YPbPr', 'Scart-YPbPr') and not getAutoresPlugin_enabled():  # path.exists(resolveFilename(SCOPE_PLUGINS)+'SystemPlugins/AutoResolution'):
 			self.list.append(getConfigListEntry(_("Automatic resolution"), config.av.autores, _("If enabled the output resolution of the box will try to match the resolution of the video contents resolution")))
-			if config.av.autores.value in ("all", "hd"):
+			if config.av.autores.value in ('all', 'hd'):
 				self.list.append(getConfigListEntry(_("Delay time"), config.av.autores_delay, _("Set the time before checking video source for resolution information.")))
 				self.list.append(getConfigListEntry(_("Automatic resolution label"), config.av.autores_label_timeout, _("Allows you to adjust the amount of time the resolution information display on screen.")))
 				self.list.append(getConfigListEntry(_("Force de-interlace"), config.av.autores_deinterlace, _("If enabled the video will always be de-interlaced.")))
-				self.list.append(getConfigListEntry(_('Always use smart1080p mode'), config.av.smart1080p, _("This option allows you to always use e.g. 1080p50 for TV/.ts, and 1080p24/p50/p60 for videos")))
+				self.list.append(getConfigListEntry(_("Always use smart1080p mode"), config.av.smart1080p, _("This option allows you to always use e.g. 1080p50 for TV/.ts, and 1080p24/p50/p60 for videos")))
 				if config.av.autores.value in 'hd':
 					self.list.append(getConfigListEntry(_("Show SD as"), config.av.autores_sd, _("This option allows you to choose how to display standard definition video on your TV.")))
 				self.list.append(getConfigListEntry(_("Show 480/576p 24fps as"), config.av.autores_480p24, _("This option allows you to choose how to display SD progressive 24Hz on your TV. (as not all TV's support these resolutions)")))
@@ -124,7 +125,7 @@ class VideoSetup(Screen, ConfigListScreen):
 				self.list.append(getConfigListEntry(_("Show 1080p 24fps as"), config.av.autores_1080p24, _("This option allows you to choose how to display 1080p 24Hz on your TV. (as not all TV's support these resolutions)")))
 				self.list.append(getConfigListEntry(_("Show 1080p 25fps as"), config.av.autores_1080p25, _("This option allows you to choose how to display 1080p 25Hz on your TV. (as not all TV's support these resolutions)")))
 				self.list.append(getConfigListEntry(_("Show 1080p 30fps as"), config.av.autores_1080p30, _("This option allows you to choose how to display 1080p 30Hz on your TV. (as not all TV's support these resolutions)")))
-				if "2160p24" in iAV.readAvailableModes():
+				if '2160p24' in iAVSwitch.readAvailableModes():
 					self.list.append(getConfigListEntry(_("Show 2160p 24fps as"), config.av.autores_2160p24, _("This option allows you to choose how to display 2160p 24Hz on your TV. (as not all TV's support these resolutions)")))
 					self.list.append(getConfigListEntry(_("Show 2160p 25fps as"), config.av.autores_2160p25, _("This option allows you to choose how to display 2160p 25Hz on your TV. (as not all TV's support these resolutions)")))
 					self.list.append(getConfigListEntry(_("Show 2160p 30fps as"), config.av.autores_2160p30, _("This option allows you to choose how to display 2160p 30Hz on your TV. (as not all TV's support these resolutions)")))
@@ -203,7 +204,7 @@ class VideoSetup(Screen, ConfigListScreen):
 		force_wide = self.hw.isWidescreenMode(port, mode)
 
 		if not force_wide:
-		 	self.list.append(getConfigListEntry(_("Aspect ratio"), config.av.aspect, _("Configure the aspect ratio of the screen.")))
+			self.list.append(getConfigListEntry(_("Aspect ratio"), config.av.aspect, _("Configure the aspect ratio of the screen.")))
 
 		if hasattr(config.av, 'policy_169'):
 			if force_wide or config.av.aspect.value in ("16:9", "16:10"):
@@ -371,7 +372,7 @@ class VideoSetup(Screen, ConfigListScreen):
 			self.reset_mode = 1
 			if autores_sd.find('1080') >= 0:
 				self.hw.setMode(port, '1080p', '50Hz')
-			elif (smart1080p == '1080p50') or (smart1080p == 'true'): # for compatibility with old ConfigEnableDisable
+			elif (smart1080p == '1080p50') or (smart1080p == 'true'):  # for compatibility with old ConfigEnableDisable
 				self.hw.setMode(port, '1080p', '50Hz')
 			elif smart1080p == '2160p50':
 				self.hw.setMode(port, '2160p', '50Hz')
@@ -442,145 +443,23 @@ class VideoSetup(Screen, ConfigListScreen):
 		from Screens.Setup import SetupSummary
 		return SetupSummary
 
-
-class AudioSetup(Screen, ConfigListScreen):
-	def __init__(self, session):
-		Screen.__init__(self, session)
-		# for the skin: first try AudioSetup, then Setup, this allows individual skinning
-		self.skinName = ["AudioSetup", "Setup"]
-		self.setup_title = _("Audio settings")
-		self["HelpWindow"] = Pixmap()
-		self["HelpWindow"].hide()
-		self["VKeyIcon"] = Boolean(False)
-		self['footnote'] = Label()
-
-		self.hw = iAVSwitch
-		self.onChangedEntry = []
-
-		# handle hotplug by re-creating setup
-		self.onShow.append(self.startHotplug)
-		self.onHide.append(self.stopHotplug)
-
-		self.list = []
-		ConfigListScreen.__init__(self, self.list, session=session, on_change=self.changedEntry)
-
-		from Components.ActionMap import ActionMap
-		self["actions"] = ActionMap(["SetupActions", "MenuActions", "ColorActions"],
-			{
-				"cancel": self.keyCancel,
-				"save": self.apply,
-				"menu": self.closeRecursive,
-			}, -2)
-
-		self["key_red"] = StaticText(_("Cancel"))
-		self["key_green"] = StaticText(_("OK"))
-		self["description"] = Label("")
-
-		self.createSetup()
-		self.onLayoutFinish.append(self.layoutFinished)
-
-	def layoutFinished(self):
-		self.setTitle(self.setup_title)
-
-	def startHotplug(self):
-		self.hw.on_hotplug.append(self.createSetup)
-
-	def stopHotplug(self):
-		self.hw.on_hotplug.remove(self.createSetup)
-
-	def createSetup(self):
-		level = config.usage.setup_level.index
-
-		self.list = []
-
-		if level >= 1:
-			if SystemInfo["CanPcmMultichannel"]:
-				self.list.append(getConfigListEntry(_("PCM Multichannel"), config.av.pcm_multichannel, _("Choose whether multi channel sound tracks should be output as PCM.")))
-			if SystemInfo["CanDownmixAC3"]:
-				self.list.append(getConfigListEntry(_("AC3 downmix"), config.av.downmix_ac3, _("Choose whether AC3 sound tracks should be downmixed to stereo.")))
-			if SystemInfo["CanAC3plusTranscode"]:
-				self.list.append(getConfigListEntry(_("AC3 plus transcoding"), config.av.transcodeac3plus, _("Choose whether AC3 Plus sound tracks should be transcoded to AC3.")))
-			if SystemInfo["CanDownmixDTS"]:
-				self.list.append(getConfigListEntry(_("DTS downmix"), config.av.downmix_dts, _("Choose whether DTS channel sound tracks should be downmixed to stereo.")))
-			if SystemInfo["CanDTSHD"]:
-				self.list.append(getConfigListEntry(_("DTS/DTS-HD HR/DTS-HD MA/DTS:X"), config.av.dtshd, _("Choose whether DTS channel sound tracks should be downmixed or transcoded.")))
-			if SystemInfo["CanWMAPRO"]:
-				self.list.append(getConfigListEntry(_("WMA Pro"), config.av.wmapro, _("Choose whether WMA Pro channel sound tracks should be downmixed or transcoded.")))
-			if SystemInfo["CanDownmixAAC"]:
-				self.list.append(getConfigListEntry(_("AAC downmix"), config.av.downmix_aac, _("Choose whether multi channel sound tracks should be downmixed to stereo.")))
-			if SystemInfo["CanDownmixAACPlus"]:
-				self.list.append(getConfigListEntry(_("AAC plus downmix"), config.av.downmix_aacplus, _("Configure whether multi channel sound tracks should be downmixed to stereo.")))
-			if SystemInfo["Canaudiosource"]:
-				self.list.append(getConfigListEntry(_("Audio Source"), config.av.audio_source, _("Choose whether multi channel sound tracks should be convert to PCM or SPDIF.")))
-			if SystemInfo["CanAACTranscode"]:
-				self.list.append(getConfigListEntry(_("AAC transcoding"), config.av.transcodeaac, _("Choose whether AAC sound tracks should be transcoded.")))
-			self.list.extend((
-				getConfigListEntry(_("General AC3 delay"), config.av.generalAC3delay, _("This option configures the general audio delay of Dolby Digital sound tracks.")),
-				getConfigListEntry(_("General PCM delay"), config.av.generalPCMdelay, _("This option configures the general audio delay of stereo sound tracks."))
-			))
-
-			if SystemInfo["Can3DSurround"]:
-				self.list.append(getConfigListEntry(_("3D Surround"), config.av.surround_3d, _("This option allows you to enable 3D Surround Sound.")))
-
-			if SystemInfo["Can3DSpeaker"] and config.av.surround_3d.value != "none":
-				self.list.append(getConfigListEntry(_("3D Surround Speaker Position"), config.av.surround_3d_speaker, _("This option allows you to change the virtuell loadspeaker position.")))
-
-			if SystemInfo["CanAutoVolume"]:
-				self.list.append(getConfigListEntry(_("Audio Auto Volume Level"), config.av.autovolume, _("This option configures you can set Auto Volume Level.")))
-			self.list.append(getConfigListEntry(_("Audio volume step size"), config.av.volume_stepsize, _("Configure the general audio volume step size (limit 1-10).")))
-			self.list.append(getConfigListEntry(_("Audio volume step size fast mode"), config.av.volume_stepsize_fastmode, _("Configure the fast mode audio volume step size (limit 1-10). Activated when volume key permanent press or press fast in a row.")))
-			self.list.append(getConfigListEntry(_("Hide mute notification"), config.av.volume_hide_mute, _("If muted, hide mute icon or mute information after few seconds.")))
-
-			if SystemInfo["CanBTAudio"]:
-				self.list.append(getConfigListEntry(_("Enable BT Audio"), config.av.btaudio, _("This Option allows you to switch Audio to BT Speakers.")))
-			if SystemInfo["CanBTAudioDelay"]:
-				self.list.append(getConfigListEntry(_("General BT Audio delay"), config.av.btaudiodelay, _("This option configures the general audio delay for BT Speakers.")))
-
-		self["config"].list = self.list
-		self["config"].l.setList(self.list)
-		if config.usage.sort_settings.value:
-			self["config"].list.sort()
-
-	def keyLeft(self):
-		ConfigListScreen.keyLeft(self)
-		self.createSetup()
-
-	def keyRight(self):
-		ConfigListScreen.keyRight(self)
-		self.createSetup()
-
-	def confirm(self, confirmed):
-		self.keySave()
-
-	def apply(self):
-		self.keySave()
-
-	# for summary:
-	def changedEntry(self):
-		for x in self.onChangedEntry:
-			x()
-
-	def getCurrentEntry(self):
-		return self["config"].getCurrent()[0]
-
-	def getCurrentValue(self):
-		return str(self["config"].getCurrent()[1].getText())
-
-	def getCurrentDescription(self):
-		return self["config"].getCurrent() and len(self["config"].getCurrent()) > 2 and self["config"].getCurrent()[2] or ""
-
-	def createSummary(self):
-		from Screens.Setup import SetupSummary
-		return SetupSummary
+	def selectionChanged(self):
+		if self["config"]:
+			self["description"].text = self.getCurrentDescription()
+		else:
+			self["description"].text = _("There are no items currently available for this screen.")
 
 
 class AutoVideoModeLabel(Screen):
 	def __init__(self, session):
 		Screen.__init__(self, session)
+
 		self["content"] = Label()
 		self["restxt"] = Label()
+
 		self.hideTimer = eTimer()
 		self.hideTimer.callback.append(self.hide)
+
 		self.onShow.append(self.hide_me)
 
 	def hide_me(self):
@@ -588,6 +467,10 @@ class AutoVideoModeLabel(Screen):
 		if idx:
 			idx += 4
 			self.hideTimer.start(idx * 1000, True)
+
+
+previous = None
+isDedicated3D = False
 
 
 def applySettings(mode=config.osd.threeDmode.value, znorm=int(config.osd.threeDznorm.value)):
@@ -616,6 +499,7 @@ def applySettings(mode=config.osd.threeDmode.value, znorm=int(config.osd.threeDz
 class AutoVideoMode(Screen):
 	def __init__(self, session):
 		Screen.__init__(self, session)
+
 		if session != None:
 			self.__event_tracker = ServiceEventTracker(screen=self, eventmap={
 					iPlayableService.evStart: self.__evStart,
@@ -673,7 +557,7 @@ class AutoVideoMode(Screen):
 		if config.av.autores.value == 'disabled' or getAutoresPlugin_enabled():
 			#print "[VideoMode] autoresolution is disabled - resolution not changed !"
 			return
-		if self.session.nav.getCurrentlyPlayingServiceReference() and not self.session.nav.getCurrentlyPlayingServiceReference().toString().startswith("4097:"):
+		if self.session.nav.getCurrentlyPlayingServiceReference() and not self.session.nav.getCurrentlyPlayingServiceReference().toString().startswith('4097:'):
 			delay = config.av.autores_delay.value
 		else:
 			delay = config.av.autores_delay.value * 2
@@ -746,6 +630,7 @@ class AutoVideoMode(Screen):
 				info = service.info()
 			else:
 				info = None
+
 			if info:
 				video_height = int(info.getInfo(iServiceInformation.sVideoHeight))
 				video_width = int(info.getInfo(iServiceInformation.sVideoWidth))

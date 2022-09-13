@@ -40,9 +40,7 @@ is usually caused by not marking PSignals as immutable.
 #include <lib/base/smartptr.h>
 #include <lib/base/eenv.h>
 #include <lib/base/eerror.h>
-#include <lib/base/etpm.h>
 #include <lib/base/message.h>
-#include <lib/base/modelinformation.h>
 #include <lib/base/e2avahi.h>
 #include <lib/driver/rc.h>
 #include <lib/driver/rcinput_swig.h>
@@ -50,7 +48,6 @@ is usually caused by not marking PSignals as immutable.
 #include <lib/service/iservice.h>
 #include <lib/service/service.h>
 #include <lib/service/servicedvb.h>
-#include <lib/service/servicefs.h>
 #include <lib/service/servicepeer.h>
 #include <lib/gdi/fb.h>
 #include <lib/gdi/font.h>
@@ -81,7 +78,7 @@ is usually caused by not marking PSignals as immutable.
 #include <lib/gui/elistboxcontent.h>
 #include <lib/gui/esubtitle.h>
 #include <lib/service/listboxservice.h>
-#include <lib/nav/core.h>
+#include <lib/nav/pcore.h>
 #include <lib/actions/action.h>
 #include <lib/gdi/gfont.h>
 #include <lib/gdi/epng.h>
@@ -100,7 +97,6 @@ is usually caused by not marking PSignals as immutable.
 #include <lib/dvb/cablescan.h>
 #include <lib/dvb/encoder.h>
 #include <lib/dvb/streamserver.h>
-#include <lib/dvb/rtspstreamserver.h>
 #include <lib/dvb/metaparser.h>
 #include <lib/components/scan.h>
 #include <lib/components/file_eraser.h>
@@ -117,7 +113,6 @@ is usually caused by not marking PSignals as immutable.
 #include <lib/python/python.h>
 #include <lib/python/python_helpers.h>
 #include <lib/gdi/picload.h>
-#include <lib/dvb/fcc.h>
 %}
 
 %feature("ref")   iObject "$this->AddRef(); /* eDebug(\"AddRef (%s:%d)!\", __FILE__, __LINE__); */ "
@@ -164,11 +159,9 @@ typedef long time_t;
 
 %immutable eSocketNotifier::activated;
 %include <lib/base/ebase.h>
-%include <lib/base/modelinformation.h>
 %include <lib/base/smartptr.h>
 %include <lib/service/event.h>
 %include <lib/service/iservice.h>
-%include <lib/service/servicefs.h>
 %include <lib/service/service.h>
 %include <lib/base/e2avahi.h>
 %include <lib/service/servicepeer.h>
@@ -194,7 +187,6 @@ typedef long time_t;
 %immutable eHdmiCEC::addressChanged;
 %immutable ePythonMessagePump::recv_msg;
 %immutable eDVBLocalTimeHandler::m_timeUpdated;
-%immutable eFCCServiceManager::m_fcc_event;
 %immutable iCryptoInfo::clientname;
 %immutable iCryptoInfo::clientinfo;
 %immutable iCryptoInfo::verboseinfo;
@@ -203,8 +195,8 @@ typedef long time_t;
 %immutable iCryptoInfo::usedcardid;
 %immutable eTuxtxtApp::appClosed;
 %immutable iDVBChannel::receivedTsidOnid;
+%immutable eDVBSatelliteEquipmentControl::slotRotorSatPosChanged;
 %include <lib/base/message.h>
-%include <lib/base/etpm.h>
 %include <lib/driver/rc.h>
 %include <lib/driver/rcinput_swig.h>
 %include <lib/gdi/fb.h>
@@ -236,7 +228,7 @@ typedef long time_t;
 %include <lib/gui/evideo.h>
 %include <lib/gui/esubtitle.h>
 %include <lib/service/listboxservice.h>
-%include <lib/nav/core.h>
+%include <lib/nav/pcore.h>
 %include <lib/actions/action.h>
 %include <lib/gdi/gfont.h>
 %include <lib/gdi/epng.h>
@@ -252,6 +244,7 @@ typedef long time_t;
 %include <lib/dvb/cahandler.h>
 %include <lib/dvb/fastscan.h>
 %include <lib/dvb/cablescan.h>
+%include <lib/dvb/metaparser.h>
 %include <lib/components/scan.h>
 %include <lib/components/file_eraser.h>
 %include <lib/components/tuxtxtapp.h>
@@ -268,10 +261,7 @@ typedef long time_t;
 %include <lib/python/python.h>
 %include <lib/python/pythonconfig.h>
 %include <lib/gdi/picload.h>
-%include <lib/dvb/fcc.h>
 %include <lib/dvb/streamserver.h>
-%include <lib/dvb/rtspstreamserver.h>
-%include <lib/dvb/metaparser.h>
 /**************  eptr  **************/
 
 /**************  signals  **************/
@@ -431,28 +421,9 @@ int getLinkedSlotID(int);
 %{
 int getLinkedSlotID(int fe)
 {
-        eFBCTunerManager *mgr = eFBCTunerManager::getInstance();
-        if (mgr) return mgr->getLinkedSlotID(fe);
-        return -1;
-}
-%}
-
-void setFCCEnable(int);
-%{
-void setFCCEnable(int enable)
-{
-        eFCCServiceManager *fcc_mng = eFCCServiceManager::getInstance();
-        if (fcc_mng) setFCCEnable(enable);
-}
-%}
-
-bool isFBCLink(int);
-%{
-bool isFBCLink(int fe)
-{
-        eFBCTunerManager *mgr = eFBCTunerManager::getInstance();
-        if (mgr) return mgr->IsFBCLink(fe);
-        return false;
+	eFBCTunerManager *mgr = eFBCTunerManager::getInstance();
+	if (mgr) return mgr->getLinkedSlotID(fe);
+	return -1;
 }
 %}
 
@@ -463,7 +434,7 @@ PyObject *getFontFaces()
 	std::vector<std::string> v = fontRenderClass::getInstance()->getFontFaces();
 	ePyObject result = PyList_New(v.size());
 	for (size_t i = 0; i < v.size(); i++)
-		PyList_SET_ITEM(result, i, PyString_FromString(v[i].c_str()));
+		PyList_SET_ITEM(result, i, PyUnicode_FromString(v[i].c_str()));
         return result;
 }
 %}
@@ -476,42 +447,32 @@ extern void runMainloop();
 extern void quitMainloop(int exit_code);
 extern eApplication *getApplication();
 extern int getPrevAsciiCode();
-extern void setPrevAsciiCode(int code);
-extern int getBsodCounter();
-extern void resetBsodCounter();
 extern void addFont(const char *filename, const char *alias, int scale_factor, int is_replacement, int renderflags = 0);
 extern const char *getEnigmaVersionString();
-extern const char *getE2Rev();
 extern const char *getGStreamerVersionString();
 extern void dump_malloc_stats(void);
+extern void pauseInit(void);
+extern void resumeInit(void);
 #ifndef HAVE_OSDANIMATION
 extern void setAnimation_current(int a);
 extern void setAnimation_speed(int speed);
-extern void setAnimation_current_listbox(int a);
 #endif
-extern void pauseInit(void);
-extern void resumeInit(void);
 %}
 
 extern void addFont(const char *filename, const char *alias, int scale_factor, int is_replacement, int renderflags = 0);
 extern int getPrevAsciiCode();
-extern void setPrevAsciiCode(int code);
-extern int getBsodCounter();
-extern void resetBsodCounter();
 extern void runMainloop();
 extern void quitMainloop(int exit_code);
 extern eApplication *getApplication();
 extern const char *getEnigmaVersionString();
-extern const char *getE2Rev();
 extern const char *getGStreamerVersionString();
 extern void dump_malloc_stats(void);
+extern void pauseInit(void);
+extern void resumeInit(void);
 #ifndef HAVE_OSDANIMATION
 extern void setAnimation_current(int a);
 extern void setAnimation_speed(int speed);
-extern void setAnimation_current_listbox(int a);
 #endif
-extern void pauseInit(void);
-extern void resumeInit(void);
 
 %include <lib/python/python_console.i>
 %include <lib/python/python_base.i>

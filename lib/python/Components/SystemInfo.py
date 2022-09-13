@@ -1,15 +1,19 @@
-from hashlib import md5
-from os import listdir, readlink
-from os.path import exists, isfile, join as pathjoin, islink
+from os import R_OK, access, listdir, walk
+from os.path import exists as fileAccess, isdir, isfile, join as pathjoin
+from re import findall
 from subprocess import PIPE, Popen
+from boxbranding import getBoxType, getBrandOEM, getDisplayType, getHaveAVJACK, getHaveHDMIinFHD, getHaveHDMIinHD, getHaveRCA, getHaveSCART, getHaveSCARTYUV, getHaveYUV, getImageType, getMachineBrand, getMachineBuild, getMachineMtdRoot, getMachineName
+from enigma import Misc_Options, eDVBCIInterfaces, eDVBResourceManager, eGetEnigmaDebugLvl
 
-from boxbranding import getBoxType
-from enigma import Misc_Options, eDVBResourceManager, eGetEnigmaDebugLvl
-
-from Tools.Directories import SCOPE_LIBDIR, SCOPE_SKINS, isPluginInstalled, fileCheck, fileReadLines, resolveFilename, fileExists, fileHas, pathExists
-from Tools.MultiBoot import MultiBoot
+from Components.About import getChipSetString
+from Components.RcModel import rc_model
+from Tools.BoxConfig import BoxConfig
+from Tools.Directories import SCOPE_SKIN, fileCheck, fileContains, fileReadLine, fileReadLines, resolveFilename, fileExists, fileHas, fileReadLine, pathExists
+from Tools.HardwareInfo import HardwareInfo
 
 MODULE_NAME = __name__.split(".")[-1]
+ENIGMA_KERNEL_MODULE = "enigma.ko"
+PROC_PATH = "/proc/enigma"
 
 SystemInfo = {}
 

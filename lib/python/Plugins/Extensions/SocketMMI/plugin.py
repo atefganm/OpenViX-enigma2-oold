@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from Plugins.Plugin import PluginDescriptor
 from .SocketMMI import SocketMMIMessageHandler
 
@@ -9,7 +10,7 @@ def main(session, **kwargs):
 
 
 def menu(menuid, **kwargs):
-	if menuid == "setup" and socketHandler and socketHandler.connected():
+	if menuid == "cam" and socketHandler and socketHandler.connected():
 		return [(socketHandler.getName(), main, "socket_mmi", 0)]
 	return []
 

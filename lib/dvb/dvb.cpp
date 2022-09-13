@@ -112,8 +112,6 @@ eDVBResourceManager::eDVBResourceManager()
 		addAdapter(adapter, true);
 	}
 
-	setUsbTuner();
-
 	int fd = open("/proc/stb/info/model", O_RDONLY);
 	char tmp[16];
 	int rd = fd >= 0 ? read(fd, tmp, sizeof(tmp)) : 0;
@@ -211,8 +209,8 @@ eDVBResourceManager::eDVBResourceManager()
 	eDebug("[eDVBResourceManager] found %zd adapter, %zd frontends(%zd sim) and %zd demux, boxtype %d",
 		m_adapter.size(), m_frontend.size(), m_simulate_frontend.size(), m_demux.size(), m_boxtype);
 
-	m_fbc_mng = new eFBCTunerManager(this);
-	
+	m_fbcmng = new eFBCTunerManager(instance);
+
 	CONNECT(m_releaseCachedChannelTimer->timeout, eDVBResourceManager::releaseCachedChannel);
 }
 

@@ -3,6 +3,10 @@ from sys import modules
 import socket
 import fcntl
 import struct
+from Tools.HardwareInfo import HardwareInfo
+from Tools.Directories import fileReadLine
+
+MODULE_NAME = __name__.split(".")[-1]
 
 
 def getVersionString():

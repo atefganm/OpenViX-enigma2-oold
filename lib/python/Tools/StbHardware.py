@@ -49,12 +49,10 @@ def setRTCoffset():
 
 
 def setRTCtime(wutime):
-        if path.exists("/proc/stb/fp/rtc_offset"):
+	if path.exists("/proc/stb/fp/rtc_offset"):
 		setRTCoffset()
 	try:
-		f = open("/proc/stb/fp/rtc", "w")
-		f.write(str(wutime))
-		f.close()
+		open("/proc/stb/fp/rtc", "w").write(str(wutime))
 	except IOError:
 		try:
 			fp = open("/dev/dbox/fp0")

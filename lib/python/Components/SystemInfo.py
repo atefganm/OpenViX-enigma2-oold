@@ -1,5 +1,5 @@
 from os import listdir
-from boxbranding import getBoxType, getBrandOEM, getDisplayType, getHaveAVJACK, getHaveHDMIinFHD, getHaveHDMIinHD, getHaveRCA, getHaveSCART, getHaveSCARTYUV, getHaveYUV, getImageType, getMachineBrand, getMachineBuild, getMachineMtdRoot, getMachineName
+from boxbranding import getBoxType, getBrandOEM, getDisplayType, getHaveAVJACK, getHaveHDMIinFHD, getHaveHDMIinHD, getHaveRCA, getHaveSCART, getHaveSCARTYUV, getHaveYUV, getImageType, getMachineBrand, getMachineBuild, getMachineMtdRoot, getMachineName, getHaveDVI, getHaveHDMI
 from enigma import Misc_Options, eDVBCIInterfaces, eDVBResourceManager
 
 from Components.About import getChipSetString
@@ -142,6 +142,17 @@ SystemInfo["hasRCA"] = getHaveRCA() in ('True',)
 SystemInfo["hasScart"] = getHaveSCART() in ('True',)
 SystemInfo["hasScartYUV"] = getHaveSCARTYUV() in ('True',)
 SystemInfo["hasYUV"] = getHaveYUV() in ('True',)
+SystemInfo["HaveTouchSensor"] = getBoxType() in ("dm520", "dm525", "dm900", "dm920")
+SystemInfo["DefaultDisplayBrightness"] = getBoxType() in ("dm900", "dm920") and 8 or 5
+SystemInfo["HDMIin"] = getMachineBuild() in ("dm7080", "dm820", "dm900", "dm920")
+SystemInfo["HaveRCA"] = getHaveRCA() in ('True',)
+SystemInfo["HaveDVI"] = getHaveDVI() in ('True',)
+SystemInfo["HAVEYUV"] = getHaveYUV() in ('True',)
+SystemInfo["HAVEHDMI"] = getHaveHDMI() in ('True',)
+SystemInfo["HAVESCART"] = getHaveSCART() in ('True',)
+SystemInfo["HAVESCARTYUV"] = getHaveSCARTYUV() in ('True',)
+SystemInfo["HaveAVJACK"] = getHaveAVJACK() in ('True',)
+SystemInfo["RecoveryMode"] = fileCheck("/proc/stb/fp/boot_mode")
 SystemInfo["VideoModes"] = getChipSetString() in (  # 2160p and 1080p capable hardware...
 	"5272s", "7251", "7251s", "7252", "7252s", "7278", "7366", "7376", "7444s", "72604", "3798mv200", "3798cv200", "3798mv200h", "hi3798mv200", "hi3798mv200h", "hi3798mv200advca", "hi3798cv200"
 ) and (

@@ -172,16 +172,18 @@ class AVSwitch:
         # check if a high-level mode with a given rate is available.
         def isModeAvailable(self, port, mode, rate):
                 rate = self.rates[mode][rate]
-                for mode in rate.values():
+                for mode in list(rate.values()):
                         if port == "DVI":
-				if getBrandOEM() in ('azbox',):
-					if mode not in self.modes_preferred and not config.av.edid_override.value:
-						print("[AVSwitch] no, not preferred")
-						return False
-			if port != "HDMI":
-				if mode not in self.readAvailableModes():
-					return False
- 		return True
+                                if BRAND in ('azbox',):
+                                        if mode not in self.modes_preferred and not config.av.edid_override.value:
+                                                print("[AVSwitch] no, not preferred")
+                                                return False
+                        if port != "HDMI":
+                                if mode not in self.readAvailableModes():
+                                        return False
+                        elif mode not in self.modes_preferred:
+                                return False
+                return True
 
         def isWidescreenMode(self, port, mode):
                 return mode in self.widescreen_modes

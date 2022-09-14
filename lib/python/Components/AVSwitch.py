@@ -173,7 +173,7 @@ class AVSwitch:
         def isModeAvailable(self, port, mode, rate):
                 rate = self.rates[mode][rate]
                 for mode in rate.values():
-			if port == "DVI":
+                        if port == "DVI":
 				if getBrandOEM() in ('azbox',):
 					if mode not in self.modes_preferred and not config.av.edid_override.value:
 						print("[AVSwitch] no, not preferred")

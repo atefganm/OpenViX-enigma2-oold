@@ -8,7 +8,7 @@ class HardwareInfo:
 
 	def __init__(self):
 		if HardwareInfo.device_name is not None:
-#			print "using cached result"
+#			print("using cached result")
 			return
 
 		HardwareInfo.device_name = "unknown"
@@ -39,7 +39,7 @@ class HardwareInfo:
 					print("dm800 detected!")
 				elif "MIPS 4KEc V4.8" in rd:
 					HardwareInfo.device_name = "dm7025"
-					print "dm7025 detected!"
+					print("dm7025 detected!")
 			except:
 				pass
 

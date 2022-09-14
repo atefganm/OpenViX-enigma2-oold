@@ -865,7 +865,7 @@ class HarddiskManager:
 		try:
 			if os.path.exists("/dev/" + blockdev):
 				open("/dev/" + blockdev).close()
-		except IOError, err:
+		except OSError as err:
 			if err.errno == 159: # no medium present
 				medium_found = False
 

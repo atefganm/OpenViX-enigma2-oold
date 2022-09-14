@@ -41,7 +41,7 @@ def setFPWakeuptime(wutime):
 
 def setRTCoffset():
 	forsleep = (localtime(time()).tm_hour-gmtime(time()).tm_hour)*3600
-	print "[RTC] set RTC offset to %s sec." % (forsleep)
+	print("[RTC] set RTC offset to %s sec." % (forsleep))
 	try:
 		open("/proc/stb/fp/rtc_offset", "w").write(str(forsleep))
 	except IOError:

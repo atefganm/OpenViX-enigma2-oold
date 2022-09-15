@@ -3,7 +3,7 @@ import socket
 import fcntl
 import struct
 
-from boxbranding import getImageVersion, getMachineBuild, getBoxType
+from boxbranding import getBoxType, getMachineBuild, getImageVersion
 
 
 def getVersionString():
